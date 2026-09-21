@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+.venv/
+.ipynb_checkpoints/
+
+# Generated model artifacts
+artifacts/models/*
+!artifacts/models/.gitkeep
+artifacts/predictions/*
+!artifacts/predictions/.gitkeep
+artifacts/reports/*
+!artifacts/reports/.gitkeep

@@ -1,0 +1,17 @@
+matplotlib
+seaborn
+numpy
+openpyxl
+pandas
+pyarrow
+scikit-learn==1.6.1
+statsmodels
+xgboost==3.4.1
+joblib==1.6.0
+holidays
+requests
+python-dotenv
+
+# if later use LSTM, add the following dependencies
+# tensorflow
+
