@@ -1,11 +1,11 @@
 metric,value
-raw_transaction_rows,6615
-clean_transaction_rows,6615
-monthly_rows,1620
+raw_transaction_rows,11040
+clean_transaction_rows,11040
+monthly_rows,2700
 unique_crops,15
 unique_locations,3
 unique_buyer_types,2
-unique_orders,6615
-date_start,2023-01-02 00:00:00
+unique_orders,11040
+date_start,2021-01-01 00:00:00
 date_end,2025-12-27 00:00:00
 missing_month_count,0

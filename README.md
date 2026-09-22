@@ -113,7 +113,7 @@ Edit `pipeline_config.json` when the client workbook name, worksheet, or date-co
 ```json
 {
   "client_data": {
-    "file": "data/raw/Dataset_3Years_15Crops_Synthetic.xlsx",
+    "file": "data/raw/Dataset_5Years_15Crops_Synthetic.xlsx",
     "sheet": "Procurement Data",
     "date_column": "Procurement Date"
   }
@@ -121,6 +121,8 @@ Edit `pipeline_config.json` when the client workbook name, worksheet, or date-co
 ```
 
 Relative file paths are resolved from the project root. The weather date range is derived from the valid client procurement dates. The holiday calendar covers the same historical period plus the next 12 forecast months automatically.
+
+The configured five-year workbook covers January 2021–December 2025. Its added 2021–2022 transactions are generated synthetic examples based on the original 2023–2025 synthetic workbook; they are not independently observed client history. Do not present a higher score from this expanded workbook as proof that more real data improved the model. The original three-year workbook remains unchanged under `data/raw`.
 
 ## Run the complete pipeline
 
@@ -534,6 +536,18 @@ artifacts/reports/xgboost_training_metadata.json
 
 `global_xgboost_pipeline.joblib` is the main reusable artifact because it contains both the fitted categorical/numeric preprocessor and the fitted XGBoost regressor. The native JSON file contains only the XGBoost model and does not contain the scikit-learn preprocessing steps.
 
+### Fine-tune XGBoost
+
+Run the separate tuner after `prepare_model_data.py` has created `data/processed/model_splits/{train,validation,test}.csv`:
+
+```powershell
+python src\modeling\tune_xgboost.py --trials 12 --folds 3 --validation-months 3
+```
+
+It compares the current XGBoost settings with 12 reproducible sampled alternatives. Each alternative is trained and checked on three rolling, chronological three-month windows from the train and validation period. It selects the lowest average fold WAPE, then refits on all pre-test data. The test split is not used for tuning or evaluated by default. Add `--evaluate-test` only for a final held-out comparison after choosing the tuning design; do not repeatedly change settings based on test results.
+
+Outputs use separate names and do not overwrite the current model: `artifacts/models/global_xgboost_tuned_pipeline.joblib`, `global_xgboost_tuned_model.json`, `artifacts/reports/xgboost_tuning_leaderboard.csv`, `xgboost_tuning_folds.csv`, and `xgboost_tuning_metadata.json`. With `--evaluate-test`, the script also writes `artifacts/predictions/xgboost_tuned_test_predictions.csv` and test metrics in the metadata. For Colab, upload or mount the repository with these three split CSVs and run the same command from the repository root after installing `requirements.txt`.
+
 ### Train global Extra Trees
 
 The reusable training module is `src/modeling/train_etr.py`. It follows the same chronological contract as XGBoost:
@@ -567,9 +581,17 @@ artifacts/reports/etr_training_metadata.json
 
 `global_etr_pipeline.joblib` contains the fitted categorical/numeric preprocessing and the fitted `ExtraTreesRegressor` together. Its validation and test prediction tables use the same identifying columns as the XGBoost prediction tables, which allows them to be joined safely for the later Ridge ensemble.
 
+### Compare XGBoost and Extra Trees with a Ridge stacker
+
+Run `notebooks/train_stacking_ensemble.ipynb` in Colab after both base-model notebooks. It reads the four validation/test prediction CSVs from `MyDrive/demand-forecasting/artifacts/predictions`, matches rows by forecast origin, target month, crop, location, and horizon, trains Ridge on validation predictions, and compares XGBoost, Extra Trees, and stacking on test predictions. It also plots actual versus predicted values, absolute errors, and MAE by horizon. No training dataset upload is needed for this experiment.
+
+The notebook saves an experimental Ridge model, comparison predictions, metrics, and metadata to `/content/stacking_artifacts` and copies them to the matching `artifacts/models`, `artifacts/predictions`, and `artifacts/reports` folders on Drive. Its validation stacking score is in-sample. The base models behind the validation predictions were trained on training data only, while the test predictions came from base models refitted on training plus validation. Therefore, treat this as a comparison experiment, not a deployable end-to-end ensemble; a production stack needs time-ordered out-of-fold base predictions and a later holdout.
+
 ### Predict future demand with XGBoost
 
-Use `notebooks/predict_xgboost.ipynb` after training. Run Jupyter from the project root or the `notebooks` folder. The notebook loads `artifacts/models/global_xgboost_pipeline.joblib` and `data/processed/future_horizon_features.csv` locally, validates all expected features and future context, predicts every crop/location/H1-H12 row, and saves the complete forecast plus an optional selected date range under `artifacts/predictions`.
+Use `notebooks/predict_xgboost.ipynb` after training. Run Jupyter from the project root or the `notebooks` folder. It defaults to `MODEL_VARIANT = "tuned"` and loads `artifacts/models/global_xgboost_tuned_pipeline.joblib`. Change that variable to `"original"` to use the retained `global_xgboost_pipeline.joblib`. The notebook reads `data/processed/future_horizon_features.csv` locally, validates all expected features and future context, predicts every crop/location/H1-H12 row, and saves variant-specific full and date-filtered forecasts under `artifacts/predictions`.
+
+To compare errors on the same held-out test rows, run `python src/modeling/analyze_xgboost_errors.py` with your Python 3 environment. It writes `artifacts/reports/xgboost_error_breakdown.csv` with overall, crop, location, and horizon metrics. Positive improvement values mean the tuned model did better; negative values identify groups where it did worse.
 
 The prediction notebook intentionally stops when target holiday or weather-pattern values are missing. Regenerate `future_horizon_features.csv` through the preprocessing pipeline whenever the source client data changes; missing future context must not be silently interpreted as zero or replaced by a training median.
 
