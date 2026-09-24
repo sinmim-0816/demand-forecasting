@@ -762,12 +762,31 @@ artifacts/price/predictions/  # Validation, test, and future price predictions
 artifacts/price/reports/      # Metrics, tuning results, and metadata
 ```
 
-### Planned price scripts
+### Price stage 1 — create historical features
 
-The price folders currently exist, but the following scripts have not been implemented yet. These commands are the intended interface and must not be run until their files are created:
+The platform-only price feature stage is implemented and does not require FAMA data:
+
+```powershell
+python src\price_forecasting\create_price_features.py
+```
+
+It reads `data/processed/shared/monthly_demand_contextual.csv` and creates leakage-safe price, demand, order, and stock history. The first 12 months of each crop/location series are removed because a valid `price_lag_12` is unavailable. Current output:
 
 ```text
-src/price_forecasting/create_price_features.py
+data/processed/price/price_features.csv
+data/processed/price/price_features.xlsx
+data/processed/price/price_features.parquet  # when pyarrow is installed
+```
+
+With the current five-year dataset, the stage produces 2,160 rows covering January 2022 through December 2025 for all 45 crop/location series.
+
+Created features include `price_lag_1`, `price_lag_3`, `price_lag_6`, `price_lag_12`, three- and six-month rolling price means, one-month absolute and percentage price changes, lagged demand, rolling demand, lagged order count, lagged stock, and lagged stock-to-demand ratio.
+
+### Remaining planned price scripts
+
+The following scripts have not been implemented yet and must not be run until their files are created:
+
+```text
 src/price_forecasting/create_price_horizon_dataset.py
 src/price_forecasting/prepare_model_data.py
 src/price_forecasting/train_xgboost.py
@@ -778,7 +797,7 @@ src/price_forecasting/analyze_errors.py
 src/price_forecasting/predict.py
 ```
 
-The intended execution order will be:
+The intended complete execution order will be:
 
 ```powershell
 python src\price_forecasting\create_price_features.py
