@@ -4,7 +4,7 @@ import pandas as pd
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-PROCESSED_DIR = PROJECT_ROOT / "data" / "processed"
+PROCESSED_DIR = PROJECT_ROOT / "data" / "processed" / "shared"
 MONTHLY_DEMAND_FILE = PROCESSED_DIR / "monthly_demand.csv"
 CONTEXTUAL_FILE = PROJECT_ROOT / "data" / "raw" / "contextual" / "Contextual_Data.xlsx"
 

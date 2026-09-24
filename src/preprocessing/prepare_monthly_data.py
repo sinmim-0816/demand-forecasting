@@ -7,7 +7,7 @@ from pipeline_config import get_client_settings
 # 1. Project Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 RAW_DIR = PROJECT_ROOT / "data" / "raw"
-PROCESSED_DIR = PROJECT_ROOT / "data" / "processed"
+PROCESSED_DIR = PROJECT_ROOT / "data" / "processed" / "shared"
 INPUT_FILE, SHEET_NAME, CLIENT_DATE_COLUMN = get_client_settings()
 
 # Create processed file to store preprocessing dataset if not exists

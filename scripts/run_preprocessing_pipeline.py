@@ -7,8 +7,10 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 PREPROCESSING_DIR = PROJECT_ROOT / "src" / "preprocessing"
-if str(PREPROCESSING_DIR) not in sys.path:
-    sys.path.insert(0, str(PREPROCESSING_DIR))
+DEMAND_DIR = PROJECT_ROOT / "src" / "demand_forecasting"
+for source_dir in (PREPROCESSING_DIR, DEMAND_DIR):
+    if str(source_dir) not in sys.path:
+        sys.path.insert(0, str(source_dir))
 
 from pipeline_config import get_client_date_range, get_client_settings
 
@@ -74,7 +76,7 @@ def main():
     print(f"Total time: {time.perf_counter() - pipeline_start:.1f} seconds.")
     print(
         "Training dataset: "
-        f"{PROJECT_ROOT / 'data' / 'processed' / 'horizon_training_dataset.csv'}"
+        f"{PROJECT_ROOT / 'data' / 'processed' / 'demand' / 'horizon_training_dataset.csv'}"
     )
     print("=" * 60)
 

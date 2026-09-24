@@ -4,9 +4,15 @@ __pycache__/
 .ipynb_checkpoints/
 
 # Generated model artifacts
-artifacts/models/*
-!artifacts/models/.gitkeep
-artifacts/predictions/*
-!artifacts/predictions/.gitkeep
-artifacts/reports/*
-!artifacts/reports/.gitkeep
+artifacts/demand/models/*
+!artifacts/demand/models/.gitkeep
+artifacts/demand/predictions/*
+!artifacts/demand/predictions/.gitkeep
+artifacts/demand/reports/*
+!artifacts/demand/reports/.gitkeep
+artifacts/price/models/*
+!artifacts/price/models/.gitkeep
+artifacts/price/predictions/*
+!artifacts/price/predictions/.gitkeep
+artifacts/price/reports/*
+!artifacts/price/reports/.gitkeep
