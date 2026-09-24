@@ -879,13 +879,37 @@ MyDrive/demand-forecasting/artifacts/price/reports/etr_training_metadata.json
 
 Extra Trees produces one `.joblib` model artifact rather than a second native JSON file. The joblib file contains the fitted preprocessor and `ExtraTreesRegressor` together.
 
+### Price stage 6 — compare stacking in Colab
+
+After both base-model notebooks finish, open and run `notebooks/price_forecasting/train_stacking_ensemble.ipynb`. It reads these four files directly from Google Drive:
+
+```text
+MyDrive/demand-forecasting/artifacts/price/predictions/xgboost_validation_predictions.csv
+MyDrive/demand-forecasting/artifacts/price/predictions/xgboost_test_predictions.csv
+MyDrive/demand-forecasting/artifacts/price/predictions/etr_validation_predictions.csv
+MyDrive/demand-forecasting/artifacts/price/predictions/etr_test_predictions.csv
+```
+
+No training dataset or future-feature dataset is needed for this experiment. The notebook matches rows by forecast origin, target month, crop, location, and horizon; verifies that the actual prices and split labels agree; fits Ridge to the two validation prediction columns; and compares XGBoost, Extra Trees, and stacking overall and by horizon.
+
+It saves:
+
+```text
+MyDrive/demand-forecasting/artifacts/price/models/experimental_ridge_stacker.joblib
+MyDrive/demand-forecasting/artifacts/price/predictions/stacking_validation_comparison.csv
+MyDrive/demand-forecasting/artifacts/price/predictions/stacking_test_comparison.csv
+MyDrive/demand-forecasting/artifacts/price/reports/stacking_metrics.csv
+MyDrive/demand-forecasting/artifacts/price/reports/stacking_training_metadata.json
+```
+
+This Ridge stack is an exploratory comparison, not a standalone deployable pipeline. Its validation metric is in-sample, and its two base models were trained on different data amounts for validation and test prediction. A production stack would require time-ordered out-of-fold base predictions and both fitted base pipelines during future forecasting.
+
 ### Remaining planned price scripts
 
 The following scripts have not been implemented yet and must not be run until their files are created:
 
 ```text
 src/price_forecasting/tune_xgboost.py
-src/price_forecasting/train_stacking.py
 src/price_forecasting/analyze_errors.py
 src/price_forecasting/predict.py
 ```
@@ -899,7 +923,7 @@ python src\price_forecasting\prepare_model_data.py
 # Run notebooks/price_forecasting/train_xgboost.ipynb in Google Colab
 python src\price_forecasting\tune_xgboost.py --trials 12 --folds 3 --validation-months 3
 # Run notebooks/price_forecasting/train_etr.ipynb in Google Colab
-python src\price_forecasting\train_stacking.py
+# Run notebooks/price_forecasting/train_stacking_ensemble.ipynb in Google Colab
 python src\price_forecasting\analyze_errors.py
 python src\price_forecasting\predict.py
 ```
