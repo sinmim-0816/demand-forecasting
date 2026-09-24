@@ -857,13 +857,34 @@ MyDrive/demand-forecasting/artifacts/price/reports/xgboost_training_metadata.jso
 
 The `.joblib` pipeline is the artifact to use for prediction because it contains both preprocessing and XGBoost. The `.json` file contains only the native XGBoost regressor.
 
+### Price stage 5 — train Extra Trees in Colab
+
+Open and run `notebooks/price_forecasting/train_etr.ipynb` in Google Colab. It reuses the same uploaded file as XGBoost:
+
+```text
+MyDrive/demand-forecasting/Dataset/price_horizon_training_dataset.csv
+```
+
+The notebook uses the same target-month split, feature columns, categorical preprocessing, metrics, prediction keys, and graphs as price XGBoost. Extra Trees trains on CPU with `n_jobs=-1`; selecting a GPU runtime does not accelerate it.
+
+It copies these artifacts to Google Drive:
+
+```text
+MyDrive/demand-forecasting/artifacts/price/models/global_etr_pipeline.joblib
+MyDrive/demand-forecasting/artifacts/price/predictions/etr_validation_predictions.csv
+MyDrive/demand-forecasting/artifacts/price/predictions/etr_test_predictions.csv
+MyDrive/demand-forecasting/artifacts/price/reports/etr_metrics.csv
+MyDrive/demand-forecasting/artifacts/price/reports/etr_training_metadata.json
+```
+
+Extra Trees produces one `.joblib` model artifact rather than a second native JSON file. The joblib file contains the fitted preprocessor and `ExtraTreesRegressor` together.
+
 ### Remaining planned price scripts
 
 The following scripts have not been implemented yet and must not be run until their files are created:
 
 ```text
 src/price_forecasting/tune_xgboost.py
-src/price_forecasting/train_etr.py
 src/price_forecasting/train_stacking.py
 src/price_forecasting/analyze_errors.py
 src/price_forecasting/predict.py
@@ -877,7 +898,7 @@ python src\price_forecasting\create_price_horizon_dataset.py
 python src\price_forecasting\prepare_model_data.py
 # Run notebooks/price_forecasting/train_xgboost.ipynb in Google Colab
 python src\price_forecasting\tune_xgboost.py --trials 12 --folds 3 --validation-months 3
-python src\price_forecasting\train_etr.py
+# Run notebooks/price_forecasting/train_etr.ipynb in Google Colab
 python src\price_forecasting\train_stacking.py
 python src\price_forecasting\analyze_errors.py
 python src\price_forecasting\predict.py
