@@ -904,6 +904,29 @@ MyDrive/demand-forecasting/artifacts/price/reports/stacking_training_metadata.js
 
 This Ridge stack is an exploratory comparison, not a standalone deployable pipeline. Its validation metric is in-sample, and its two base models were trained on different data amounts for validation and test prediction. A production stack would require time-ordered out-of-fold base predictions and both fitted base pipelines during future forecasting.
 
+### Price stage 7 — predict future prices locally
+
+XGBoost is the selected price model. Open and run `notebooks/price_forecasting/predict_xgboost.ipynb` in the local Jupyter environment. It loads:
+
+```text
+artifacts/price/models/global_xgboost_pipeline.joblib
+artifacts/price/models/global_xgboost_model.json
+artifacts/price/reports/xgboost_training_metadata.json
+data/processed/price/future_price_horizon_features.csv
+data/processed/price/price_horizon_training_dataset.csv
+```
+
+The notebook checks the local scikit-learn and XGBoost versions against the training metadata before loading the pipeline. If the complete joblib cannot cross the Colab-to-local Python boundary, the notebook automatically loads the portable native XGBoost JSON and deterministically refits only the categorical/numeric preprocessor on the same pre-test historical rows. It does not retrain the XGBoost trees. It then validates all model features, target-month holidays, weather normals, unique row keys, and H1–H12 coverage before predicting.
+
+With the current future dataset, it predicts 540 rows: 45 crop/location series for January through December 2026. It saves:
+
+```text
+artifacts/price/predictions/xgboost_future_price_forecast_h1_h12.csv
+artifacts/price/predictions/xgboost_price_forecast_2026_01_to_2026_12.csv
+```
+
+Each output row contains the forecast origin, target month, horizon, crop, location, and `predicted_procurement_price_rm_per_kg`.
+
 ### Remaining planned price scripts
 
 The following scripts have not been implemented yet and must not be run until their files are created:
@@ -911,7 +934,6 @@ The following scripts have not been implemented yet and must not be run until th
 ```text
 src/price_forecasting/tune_xgboost.py
 src/price_forecasting/analyze_errors.py
-src/price_forecasting/predict.py
 ```
 
 The intended complete execution order will be:
@@ -925,7 +947,7 @@ python src\price_forecasting\tune_xgboost.py --trials 12 --folds 3 --validation-
 # Run notebooks/price_forecasting/train_etr.ipynb in Google Colab
 # Run notebooks/price_forecasting/train_stacking_ensemble.ipynb in Google Colab
 python src\price_forecasting\analyze_errors.py
-python src\price_forecasting\predict.py
+# Run notebooks/price_forecasting/predict_xgboost.ipynb locally
 ```
 
 ### Planned price target and inputs
