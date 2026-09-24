@@ -782,14 +782,86 @@ With the current five-year dataset, the stage produces 2,160 rows covering Janua
 
 Created features include `price_lag_1`, `price_lag_3`, `price_lag_6`, `price_lag_12`, three- and six-month rolling price means, one-month absolute and percentage price changes, lagged demand, rolling demand, lagged order count, lagged stock, and lagged stock-to-demand ratio.
 
+### Price stage 2 — create H1–H12 datasets
+
+The price multi-horizon stage is implemented:
+
+```powershell
+python src\price_forecasting\create_price_horizon_dataset.py
+```
+
+It expands every eligible forecast-origin row into horizons 1 through 12. The training target is `future_weighted_avg_procurement_price_rm_per_kg`. Price, demand, order, and stock features remain anchored to the forecast-origin month. Only known target-month calendar fields and historical target-month weather normals are added for the future month.
+
+The script creates:
+
+```text
+data/processed/price/price_horizon_training_dataset.csv
+data/processed/price/price_horizon_training_dataset.xlsx
+data/processed/price/price_horizon_training_dataset.parquet  # when pyarrow is installed
+data/processed/price/future_price_horizon_features.csv
+```
+
+With the current data, the training table contains 22,410 labelled rows. The future template contains 540 unlabelled rows: 45 crop/location series multiplied by 12 horizons, using December 2025 as the forecast origin and January through December 2026 as target months.
+
+The future template deliberately leaves the future price target empty. It must be passed to a fitted model only after the later model-data preparation and training stages are complete.
+
+### Price stage 3 — prepare chronological model splits
+
+The price model-data preparation stage is implemented:
+
+```powershell
+python src\price_forecasting\prepare_model_data.py
+```
+
+It excludes the two date identifiers and `future_weighted_avg_procurement_price_rm_per_kg` from the model inputs, defines `crop`, `location`, `origin_season`, and `target_season` as categorical features, and defines the remaining inputs as numeric features. The reusable preprocessor applies most-frequent imputation and one-hot encoding to categorical values, and median imputation to numeric values. Each fitted model pipeline must fit this preprocessor on its training rows only.
+
+The split is based on `target_month`, not random rows:
+
+```text
+Train:      19,170 rows, February 2022 through June 2025
+Validation:  1,620 rows, July 2025 through September 2025
+Test:        1,620 rows, October 2025 through December 2025
+```
+
+All three splits contain H1–H12 and have no overlapping target months. Outputs are saved to:
+
+```text
+data/processed/price/model_splits/train.csv
+data/processed/price/model_splits/validation.csv
+data/processed/price/model_splits/test.csv
+artifacts/price/reports/model_data_split.json
+```
+
+### Price stage 4 — train XGBoost in Colab
+
+Open and run `notebooks/price_forecasting/train_xgboost.ipynb` in Google Colab. Upload this one training file to Google Drive first:
+
+```text
+MyDrive/demand-forecasting/Dataset/price_horizon_training_dataset.csv
+```
+
+The notebook is standalone and recreates the same target-month chronological split internally, so the three local split CSVs do not need to be uploaded. It performs categorical encoding and numeric imputation inside the model pipeline, trains a validation model on training rows, refits a final model on training plus validation rows, and evaluates the untouched test period.
+
+It reports MAE, RMSE, WAPE, and R² overall and for every H1–H12 horizon. It also displays actual-versus-predicted prices, the absolute-error distribution, and MAE by horizon.
+
+Artifacts are saved temporarily under `/content/price_xgboost_artifacts` and copied to:
+
+```text
+MyDrive/demand-forecasting/artifacts/price/models/global_xgboost_pipeline.joblib
+MyDrive/demand-forecasting/artifacts/price/models/global_xgboost_model.json
+MyDrive/demand-forecasting/artifacts/price/predictions/xgboost_validation_predictions.csv
+MyDrive/demand-forecasting/artifacts/price/predictions/xgboost_test_predictions.csv
+MyDrive/demand-forecasting/artifacts/price/reports/xgboost_metrics.csv
+MyDrive/demand-forecasting/artifacts/price/reports/xgboost_training_metadata.json
+```
+
+The `.joblib` pipeline is the artifact to use for prediction because it contains both preprocessing and XGBoost. The `.json` file contains only the native XGBoost regressor.
+
 ### Remaining planned price scripts
 
 The following scripts have not been implemented yet and must not be run until their files are created:
 
 ```text
-src/price_forecasting/create_price_horizon_dataset.py
-src/price_forecasting/prepare_model_data.py
-src/price_forecasting/train_xgboost.py
 src/price_forecasting/tune_xgboost.py
 src/price_forecasting/train_etr.py
 src/price_forecasting/train_stacking.py
@@ -803,7 +875,7 @@ The intended complete execution order will be:
 python src\price_forecasting\create_price_features.py
 python src\price_forecasting\create_price_horizon_dataset.py
 python src\price_forecasting\prepare_model_data.py
-python src\price_forecasting\train_xgboost.py
+# Run notebooks/price_forecasting/train_xgboost.ipynb in Google Colab
 python src\price_forecasting\tune_xgboost.py --trials 12 --folds 3 --validation-months 3
 python src\price_forecasting\train_etr.py
 python src\price_forecasting\train_stacking.py
