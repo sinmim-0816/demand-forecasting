@@ -1,0 +1,16 @@
+crop,location,target_month,predicted_price_rm_per_kg,forecast_source
+Bittergourd,Kuching,2026-01,6.20,simulated_example
+Cucumber,Kuching,2026-01,4.80,simulated_example
+Okra,Kuching,2026-01,5.50,simulated_example
+Redchilli,Kuching,2026-01,10.80,simulated_example
+Tomato,Kuching,2026-01,5.00,simulated_example
+Bittergourd,Kuching,2026-02,6.40,simulated_example
+Cucumber,Kuching,2026-02,4.90,simulated_example
+Okra,Kuching,2026-02,5.70,simulated_example
+Redchilli,Kuching,2026-02,11.10,simulated_example
+Tomato,Kuching,2026-02,5.20,simulated_example
+Bittergourd,Kuching,2026-03,6.50,simulated_example
+Cucumber,Kuching,2026-03,5.00,simulated_example
+Okra,Kuching,2026-03,5.80,simulated_example
+Redchilli,Kuching,2026-03,11.30,simulated_example
+Tomato,Kuching,2026-03,5.30,simulated_example

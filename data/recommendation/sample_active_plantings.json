@@ -1,0 +1,11 @@
+[
+  {
+    "farm_id": "FARM001",
+    "crop": "Tomato",
+    "allocated_area_hectares": 0.75,
+    "planting_date": "2025-11-01",
+    "expected_harvest_date": "2026-02-15",
+    "status": "active"
+  }
+]
+

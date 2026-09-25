@@ -1,0 +1,10 @@
+{
+  "farmer_id": "F001",
+  "farm_id": "FARM001",
+  "location": "Kuching",
+  "total_area_hectares": 2.0,
+  "requested_area_hectares": 0.5,
+  "planting_month": "2026-01",
+  "planning_horizon_months": 12
+}
+

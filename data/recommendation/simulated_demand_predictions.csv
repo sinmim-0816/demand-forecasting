@@ -1,0 +1,16 @@
+crop,location,target_month,predicted_demand_kg,forecast_source
+Bittergourd,Kuching,2026-01,3200,simulated_example
+Cucumber,Kuching,2026-01,3800,simulated_example
+Okra,Kuching,2026-01,3500,simulated_example
+Redchilli,Kuching,2026-01,2800,simulated_example
+Tomato,Kuching,2026-01,4100,simulated_example
+Bittergourd,Kuching,2026-02,3350,simulated_example
+Cucumber,Kuching,2026-02,3900,simulated_example
+Okra,Kuching,2026-02,3650,simulated_example
+Redchilli,Kuching,2026-02,3000,simulated_example
+Tomato,Kuching,2026-02,4200,simulated_example
+Bittergourd,Kuching,2026-03,3400,simulated_example
+Cucumber,Kuching,2026-03,4000,simulated_example
+Okra,Kuching,2026-03,3750,simulated_example
+Redchilli,Kuching,2026-03,3100,simulated_example
+Tomato,Kuching,2026-03,4300,simulated_example
