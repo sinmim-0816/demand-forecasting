@@ -130,7 +130,9 @@ def month_number(month_text):
 
 def create_candidates(farmer, supported_crops):
     demand = load_forecasts(DEMAND_FORECAST_FILE, "predicted_demand_kg")
-    price = load_forecasts(PRICE_FORECAST_FILE, "predicted_price_rm_per_kg")
+    price = load_forecasts(
+        PRICE_FORECAST_FILE, "predicted_procurement_price_rm_per_kg"
+    )
 
     demand_keys = set(demand)
     price_keys = set(price)
@@ -166,13 +168,13 @@ def create_candidates(farmer, supported_crops):
                 "target_month": target_month,
                 "predicted_demand_kg": demand_row["predicted_demand_kg"],
                 "predicted_price_rm_per_kg": price_row[
-                    "predicted_price_rm_per_kg"
+                    "predicted_procurement_price_rm_per_kg"
                 ],
                 "demand_forecast_source": demand_row.get(
                     "forecast_source", "unspecified"
                 ),
                 "price_forecast_source": price_row.get(
-                    "forecast_source", "unspecified"
+                    "forecast_source", "xgboost_price"
                 ),
                 "forecast_confidence": "not_assessed",
             }
@@ -224,7 +226,7 @@ def generate_recommendations():
             "confidence_in_score": False,
         },
         "limitations": [
-            "The current forecast inputs are simulated examples, not model predictions.",
+            "Forecast confidence is not yet estimated for individual candidate rows.",
             "This ranks market opportunity and does not assess agronomic suitability.",
             "Crop growth duration is not yet used to convert planting month into harvest month.",
         ],

@@ -1,6 +1,7 @@
 __pycache__/
 *.py[cod]
 .venv/
+.prediction_venv/
 .ipynb_checkpoints/
 
 # Generated model artifacts
