@@ -17,6 +17,13 @@ GROUP_COLUMNS = ["crop", "location"]
 PRICE_COLUMN = "weighted_avg_procurement_price_rm_per_kg"
 DEMAND_LAGS = [1, 3, 6, 12]
 PRICE_LAGS = [1, 3]
+AIR_QUALITY_COLUMNS = [
+    "avg_api",
+    "max_api",
+    "moderate_or_worse_days",
+    "unhealthy_days",
+]
+SOLAR_COLUMN = "avg_daily_shortwave_radiation_mj_m2"
 
 
 def load_data():
@@ -27,7 +34,15 @@ def load_data():
         )
 
     df = pd.read_csv(INPUT_FILE)
-    required = ["month", "crop", "location", "demand_kg", PRICE_COLUMN]
+    required = [
+        "month",
+        "crop",
+        "location",
+        "demand_kg",
+        PRICE_COLUMN,
+        *AIR_QUALITY_COLUMNS,
+        SOLAR_COLUMN,
+    ]
     missing = [column for column in required if column not in df.columns]
     if missing:
         raise ValueError(f"Input is missing required columns: {', '.join(missing)}")
@@ -94,6 +109,18 @@ def create_features(df):
         [featured[column] for column in GROUP_COLUMNS]
     ).transform(lambda values: values.rolling(3).mean())
 
+    grouped_rows = featured.groupby(GROUP_COLUMNS, sort=False)
+    featured["api_lag_1"] = grouped_rows["avg_api"].shift(1)
+    featured["rolling_avg_api_3m"] = grouped_rows["avg_api"].transform(
+        lambda values: values.rolling(3).mean()
+    )
+    featured["rolling_unhealthy_days_3m"] = grouped_rows[
+        "unhealthy_days"
+    ].transform(lambda values: values.rolling(3).sum())
+    featured["rolling_solar_radiation_mean_3m"] = grouped_rows[
+        SOLAR_COLUMN
+    ].transform(lambda values: values.rolling(3).mean())
+
     return featured
 
 
@@ -109,6 +136,10 @@ def keep_model_ready_rows(featured):
         "price_lag_1",
         "price_lag_3",
         "rolling_price_mean_3",
+        "api_lag_1",
+        "rolling_avg_api_3m",
+        "rolling_unhealthy_days_3m",
+        "rolling_solar_radiation_mean_3m",
     ]
 
     # Infinite values cannot be consumed safely by the modelling stage.

@@ -19,7 +19,20 @@ WEATHER_RENAME_MAP = {
     "Avg Min Temperature (°C)": "avg_min_temperature_c",
     "Avg Max Temperature (°C)": "avg_max_temperature_c",
     "Total Precipitation (mm)": "total_precipitation_mm",
+    "Avg Daily Shortwave Radiation (MJ/m²)": (
+        "avg_daily_shortwave_radiation_mj_m2"
+    ),
     "Observation Days": "weather_observation_days",
+}
+
+AIR_QUALITY_RENAME_MAP = {
+    "Month": "month",
+    "Location/Region": "location",
+    "Avg API": "avg_api",
+    "Max API": "max_api",
+    "Moderate or Worse Days": "moderate_or_worse_days",
+    "Unhealthy Days": "unhealthy_days",
+    "API Observation Days": "api_observation_days",
 }
 
 HOLIDAY_RENAME_MAP = {
@@ -53,47 +66,75 @@ def load_inputs():
 
     demand = pd.read_csv(MONTHLY_DEMAND_FILE)
     weather = pd.read_excel(CONTEXTUAL_FILE, sheet_name="Weather", engine="openpyxl")
+    air_quality = pd.read_excel(
+        CONTEXTUAL_FILE,
+        sheet_name="Air_Quality",
+        engine="openpyxl",
+    )
     holidays = pd.read_excel(
         CONTEXTUAL_FILE, sheet_name="Holidays", engine="openpyxl"
     )
 
     require_columns(demand, ["month", "crop", "location", "demand_kg"], "Demand")
     require_columns(weather, WEATHER_RENAME_MAP, "Weather")
+    require_columns(air_quality, AIR_QUALITY_RENAME_MAP, "Air quality")
     require_columns(holidays, HOLIDAY_RENAME_MAP, "Holidays")
 
-    return demand, weather, holidays
+    return demand, weather, air_quality, holidays
 
 
-def prepare_inputs(demand, weather, holidays):
+def prepare_inputs(demand, weather, air_quality, holidays):
     demand = demand.copy()
     weather = weather[list(WEATHER_RENAME_MAP)].rename(columns=WEATHER_RENAME_MAP)
+    air_quality = air_quality[list(AIR_QUALITY_RENAME_MAP)].rename(
+        columns=AIR_QUALITY_RENAME_MAP
+    )
     holidays = holidays[list(HOLIDAY_RENAME_MAP)].rename(columns=HOLIDAY_RENAME_MAP)
 
     demand["month"] = pd.to_datetime(demand["month"], errors="coerce")
     weather["month"] = pd.to_datetime(weather["month"], errors="coerce")
+    air_quality["month"] = pd.to_datetime(
+        air_quality["month"], errors="coerce"
+    )
     holidays["month"] = pd.to_datetime(holidays["month"], errors="coerce")
 
-    for name, df in (("Demand", demand), ("Weather", weather), ("Holidays", holidays)):
+    for name, df in (
+        ("Demand", demand),
+        ("Weather", weather),
+        ("Air quality", air_quality),
+        ("Holidays", holidays),
+    ):
         if df["month"].isna().any():
             raise ValueError(f"{name} contains invalid month values.")
         df["month"] = df["month"].dt.to_period("M").dt.to_timestamp()
 
     demand["location"] = demand["location"].astype("string").str.strip().str.title()
     weather["location"] = weather["location"].astype("string").str.strip().str.title()
+    air_quality["location"] = (
+        air_quality["location"].astype("string").str.strip().str.title()
+    )
 
     if demand.duplicated(["month", "crop", "location"]).any():
         raise ValueError("Demand has duplicate Month + Crop + Location rows.")
     if weather.duplicated(["month", "location"]).any():
         raise ValueError("Weather has duplicate Month + Location rows.")
+    if air_quality.duplicated(["month", "location"]).any():
+        raise ValueError("Air quality has duplicate Month + Location rows.")
     if holidays.duplicated(["month"]).any():
         raise ValueError("Holidays has duplicate Month rows.")
 
-    return demand, weather, holidays
+    return demand, weather, air_quality, holidays
 
 
-def merge_contextual_data(demand, weather, holidays):
+def merge_contextual_data(demand, weather, air_quality, holidays):
     merged = demand.merge(
         weather,
+        on=["month", "location"],
+        how="left",
+        validate="many_to_one",
+    )
+    merged = merged.merge(
+        air_quality,
         on=["month", "location"],
         how="left",
         validate="many_to_one",
@@ -107,6 +148,11 @@ def merge_contextual_data(demand, weather, holidays):
 
     contextual_columns = [
         *[column for column in WEATHER_RENAME_MAP.values() if column not in {"month", "location"}],
+        *[
+            column
+            for column in AIR_QUALITY_RENAME_MAP.values()
+            if column not in {"month", "location"}
+        ],
         *[column for column in HOLIDAY_RENAME_MAP.values() if column != "month"],
     ]
     missing_counts = merged[contextual_columns].isna().sum()
@@ -143,10 +189,12 @@ def save_outputs(merged):
 
 
 def main():
-    print("Merging monthly demand with Weather and Holidays...")
-    demand, weather, holidays = load_inputs()
-    demand, weather, holidays = prepare_inputs(demand, weather, holidays)
-    merged = merge_contextual_data(demand, weather, holidays)
+    print("Merging monthly demand with weather, air quality, and holidays...")
+    demand, weather, air_quality, holidays = load_inputs()
+    demand, weather, air_quality, holidays = prepare_inputs(
+        demand, weather, air_quality, holidays
+    )
+    merged = merge_contextual_data(demand, weather, air_quality, holidays)
     save_outputs(merged)
     print("CONTEXTUAL MERGE COMPLETE")
 

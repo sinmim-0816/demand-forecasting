@@ -18,6 +18,11 @@ from pipeline_config import get_client_date_range, get_client_settings
 STAGES = [
     ("monthly", "Prepare monthly demand", "prepare_monthly_data"),
     ("weather", "Download and prepare weather", "prepare_weather_data"),
+    (
+        "air-quality",
+        "Prepare official API haze features",
+        "prepare_air_quality_data",
+    ),
     ("holidays", "Prepare holiday features", "prepare_holidays_data"),
     ("merge", "Merge contextual data", "merge_contextual_data"),
     ("features", "Create time-series features", "create_features"),

@@ -26,6 +26,14 @@ TARGET_HOLIDAY_COLUMNS = [
     "christmas",
     "major_festival",
 ]
+ORIGIN_AIR_QUALITY_COLUMNS = [
+    "avg_api",
+    "max_api",
+    "moderate_or_worse_days",
+    "unhealthy_days",
+    "api_observation_days",
+]
+SOLAR_COLUMN = "avg_daily_shortwave_radiation_mj_m2"
 HOLIDAY_RENAME_MAP = {
     "Month": "month",
     "Public Holiday Count": "public_holiday_count",
@@ -84,6 +92,8 @@ def load_inputs():
             "demand_kg",
             "avg_temperature_c",
             "total_precipitation_mm",
+            SOLAR_COLUMN,
+            *ORIGIN_AIR_QUALITY_COLUMNS,
             *TARGET_HOLIDAY_COLUMNS,
         ],
         "Contextual dataset",
@@ -126,11 +136,17 @@ def expand_horizons(features):
         "avg_min_temperature_c": "origin_avg_min_temperature_c",
         "avg_max_temperature_c": "origin_avg_max_temperature_c",
         "total_precipitation_mm": "origin_total_precipitation_mm",
+        SOLAR_COLUMN: f"origin_{SOLAR_COLUMN}",
         "weather_observation_days": "origin_weather_observation_days",
         "year": "origin_year",
         "month_number": "origin_month_number",
         "quarter": "origin_quarter",
         "season": "origin_season",
+        **{
+            column: f"origin_{column}"
+            for column in ORIGIN_AIR_QUALITY_COLUMNS
+            if column in features.columns
+        },
         **{
             column: f"origin_{column}"
             for column in TARGET_HOLIDAY_COLUMNS
@@ -199,6 +215,7 @@ def add_leakage_safe_weather_normals(expanded, contextual):
             "location",
             "avg_temperature_c",
             "total_precipitation_mm",
+            SOLAR_COLUMN,
         ]
     ].drop_duplicates()
     if weather.duplicated(["month", "location"]).any():
@@ -229,6 +246,7 @@ def add_leakage_safe_weather_normals(expanded, contextual):
     normals = candidates.groupby("_horizon_row_id", as_index=False).agg(
         target_month_normal_temperature=("avg_temperature_c", "mean"),
         target_month_normal_precipitation=("total_precipitation_mm", "mean"),
+        target_month_normal_solar_radiation=(SOLAR_COLUMN, "mean"),
         target_month_weather_history_years=("weather_month", "count"),
     )
 
@@ -253,6 +271,9 @@ def build_horizon_dataset(features, contextual, holiday_calendar):
     expanded["target_month_normal_precipitation"] = expanded[
         "target_month_normal_precipitation"
     ].round(2)
+    expanded["target_month_normal_solar_radiation"] = expanded[
+        "target_month_normal_solar_radiation"
+    ].round(2)
 
     expanded = expanded.drop(columns=["_horizon_row_id"])
     expanded = expanded.sort_values(
@@ -266,6 +287,7 @@ def create_training_dataset(horizon_data):
     required = [
         "target_month_normal_temperature",
         "target_month_normal_precipitation",
+        "target_month_normal_solar_radiation",
         *[f"target_{column}" for column in TARGET_HOLIDAY_COLUMNS],
     ]
     if training[required].isna().any().any():

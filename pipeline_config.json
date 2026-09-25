@@ -3,5 +3,10 @@
     "file": "data/raw/Dataset_5Years_15Crops_Synthetic.xlsx",
     "sheet": "Procurement Data",
     "date_column": "Procurement Date"
+  },
+  "air_quality_data": {
+    "file": "data/raw/contextual/Fam Sin - Swinburne Uni (4086) (API 2019-2025).xlsx",
+    "sheet": "Sheet1",
+    "header_row": 3
   }
 }

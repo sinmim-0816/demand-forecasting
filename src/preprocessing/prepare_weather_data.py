@@ -1,7 +1,10 @@
+import json
 from pathlib import Path
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlencode
+from urllib.request import urlopen
 
 import pandas as pd
-import requests
 
 from pipeline_config import get_client_date_range
 
@@ -45,6 +48,7 @@ def create_contextual_workbook_if_needed():
         "Avg Min Temperature (°C)",
         "Avg Max Temperature (°C)",
         "Total Precipitation (mm)",
+        "Avg Daily Shortwave Radiation (MJ/m²)",
         "Observation Days",
         "Source",
     ]
@@ -54,7 +58,9 @@ def create_contextual_workbook_if_needed():
         "Location/Region",
         "Avg API",
         "Max API",
+        "Moderate or Worse Days",
         "Unhealthy Days",
+        "API Observation Days",
         "Source",
     ]
 
@@ -104,7 +110,8 @@ def fetch_weather_for_location(location, latitude, longitude, start_date, end_da
             "temperature_2m_mean,"
             "temperature_2m_min,"
             "temperature_2m_max,"
-            "precipitation_sum"
+            "precipitation_sum,"
+            "shortwave_radiation_sum"
         ),
         # Malaysian local time
         "timezone": "Asia/Kuching",
@@ -114,21 +121,19 @@ def fetch_weather_for_location(location, latitude, longitude, start_date, end_da
         "precipitation_unit": "mm",
     }
 
-    response = requests.get(API_URL, params=params, timeout=60)
-
-    # API ERROR HANDLING
-    if response.status_code != 200:
-
-        print()
-        print(f"Open-Meteo error for {location}")
-
-        print(f"HTTP status: " f"{response.status_code}")
-
-        print(response.text)
-
-        response.raise_for_status()
-
-    data = response.json()
+    request_url = f"{API_URL}?{urlencode(params)}"
+    try:
+        with urlopen(request_url, timeout=60) as response:
+            data = json.loads(response.read().decode("utf-8"))
+    except HTTPError as error:
+        details = error.read().decode("utf-8", errors="replace")
+        raise RuntimeError(
+            f"Open-Meteo HTTP {error.code} for {location}: {details}"
+        ) from error
+    except URLError as error:
+        raise RuntimeError(
+            f"Could not reach Open-Meteo for {location}: {error.reason}"
+        ) from error
 
     if "daily" not in data:
 
@@ -144,6 +149,9 @@ def fetch_weather_for_location(location, latitude, longitude, start_date, end_da
             "daily_min_temperature_c": daily["temperature_2m_min"],
             "daily_max_temperature_c": daily["temperature_2m_max"],
             "daily_precipitation_mm": daily["precipitation_sum"],
+            "daily_shortwave_radiation_mj_m2": daily[
+                "shortwave_radiation_sum"
+            ],
         }
     )
 
@@ -205,6 +213,10 @@ def create_monthly_weather(daily_weather):
         avg_min_temperature_c=("daily_min_temperature_c", "mean"),
         avg_max_temperature_c=("daily_max_temperature_c", "mean"),
         total_precipitation_mm=("daily_precipitation_mm", "sum"),
+        avg_daily_shortwave_radiation_mj_m2=(
+            "daily_shortwave_radiation_mj_m2",
+            "mean",
+        ),
         observation_days=("date", "count"),
     )
 
@@ -220,6 +232,10 @@ def create_monthly_weather(daily_weather):
 
     monthly["total_precipitation_mm"] = monthly["total_precipitation_mm"].round(2)
 
+    monthly["avg_daily_shortwave_radiation_mj_m2"] = monthly[
+        "avg_daily_shortwave_radiation_mj_m2"
+    ].round(2)
+
     # ========================================================
     # RENAME FINAL COLUMNS
     # ========================================================
@@ -232,6 +248,9 @@ def create_monthly_weather(daily_weather):
             "avg_min_temperature_c": "Avg Min Temperature (°C)",
             "avg_max_temperature_c": "Avg Max Temperature (°C)",
             "total_precipitation_mm": "Total Precipitation (mm)",
+            "avg_daily_shortwave_radiation_mj_m2": (
+                "Avg Daily Shortwave Radiation (MJ/m²)"
+            ),
             "observation_days": "Observation Days",
         }
     )

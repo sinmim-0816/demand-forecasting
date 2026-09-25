@@ -12,21 +12,21 @@ Raw client Excel workbook
         v
 1. Clean and aggregate monthly demand
         |
-        +--------------------+
-        |                    |
-        v                    v
-2. Prepare weather     3. Prepare holidays
-        |                    |
-        +---------+----------+
-                  |
-                  v
-4. Merge contextual data
-                  |
-                  v
-5. Create lag and rolling features
-                  |
-                  v
-6. Expand into H1-H12 horizon rows
+        +----------------+----------------+
+        |                |                |
+        v                v                v
+2. Weather/solar   3. Air quality    4. Holidays
+        |                |                |
+        +----------------+----------------+
+                         |
+                         v
+5. Merge contextual data
+                         |
+                         v
+6. Create lag and rolling features
+                         |
+                         v
+7. Expand into H1-H12 horizon rows
                   |
                   v
 horizon_training_dataset.csv
@@ -42,7 +42,8 @@ demand-forecasting/
 │   ├── raw/
 │   │   ├── Dataset_3Years_15Crops_Synthetic.xlsx
 │   │   └── contextual/
-│   │       └── Contextual_Data.xlsx
+│   │       ├── Contextual_Data.xlsx
+│   │       └── Fam Sin - Swinburne Uni (4086) (API 2019-2025).xlsx
 │   ├── processed/
 │   │   ├── shared/             # Cleaned monthly/contextual tables
 │   │   ├── demand/             # Demand features, horizons, and splits
@@ -56,6 +57,7 @@ demand-forecasting/
 │   │   ├── pipeline_config.py
 │   │   ├── prepare_monthly_data.py
 │   │   ├── prepare_weather_data.py
+│   │   ├── prepare_air_quality_data.py
 │   │   ├── prepare_holidays_data.py
 │   │   └── merge_contextual_data.py
 │   ├── demand_forecasting/
@@ -95,11 +97,11 @@ demand-forecasting/
 | Folder | Purpose |
 |---|---|
 | `data/raw` | Original client and contextual source data. These files are inputs and should not be overwritten by modelling code. |
-| `data/processed/shared` | Reusable cleaned monthly demand, price, weather, and holiday context. |
+| `data/processed/shared` | Reusable cleaned monthly demand, price, weather, solar-radiation, air-quality, and holiday context. |
 | `data/processed/demand` | Demand-specific features, H1–H12 rows, future features, and splits. |
 | `data/processed/price` | Price-specific features, H1–H12 rows, future features, and splits. |
 | `data/external/market_prices` | Optional external market-price sources such as FAMA data. |
-| `src/preprocessing` | Shared cleaning, aggregation, weather, holiday, and contextual merging. |
+| `src/preprocessing` | Shared cleaning, aggregation, weather, solar-radiation, air-quality, holiday, and contextual merging. |
 | `src/demand_forecasting` | Demand feature engineering, splitting, training, tuning, and evaluation. |
 | `src/price_forecasting` | Price feature engineering, splitting, training, tuning, and evaluation. |
 | `src/modeling` | Compatibility wrappers that preserve the previous demand commands. |
@@ -138,11 +140,16 @@ Edit `pipeline_config.json` when the client workbook name, worksheet, or date-co
     "file": "data/raw/Dataset_5Years_15Crops_Synthetic.xlsx",
     "sheet": "Procurement Data",
     "date_column": "Procurement Date"
+  },
+  "air_quality_data": {
+    "file": "data/raw/contextual/Fam Sin - Swinburne Uni (4086) (API 2019-2025).xlsx",
+    "sheet": "Sheet1",
+    "header_row": 3
   }
 }
 ```
 
-Relative file paths are resolved from the project root. The weather date range is derived from the valid client procurement dates. The holiday calendar covers the same historical period plus the next 12 forecast months automatically.
+Relative file paths are resolved from the project root. Weather and air-quality dates are derived from the valid client procurement dates. `header_row` is the one-based Excel row containing the API column headings. The holiday calendar covers the same historical period plus the next 12 forecast months automatically.
 
 The configured five-year workbook covers January 2021–December 2025. Its added 2021–2022 transactions are generated synthetic examples based on the original 2023–2025 synthetic workbook; they are not independently observed client history. Do not present a higher score from this expanded workbook as proof that more real data improved the model. The original three-year workbook remains unchanged under `data/raw`.
 
@@ -156,7 +163,7 @@ Run these commands from the project root after activating `.venv`. They are show
 python scripts\run_preprocessing_pipeline.py
 ```
 
-This runs raw-data cleaning, monthly aggregation, weather, holidays, contextual merging, demand features, and H1–H12 transformation. Its final outputs are:
+This runs raw-data cleaning, monthly aggregation, weather and solar radiation, official API haze preparation, holidays, contextual merging, demand features, and H1–H12 transformation. Its final outputs are:
 
 ```text
 data/processed/demand/horizon_training_dataset.csv
@@ -257,12 +264,13 @@ Run this command from the project root:
 python scripts\run_preprocessing_pipeline.py
 ```
 
-The runner executes all six stages in order and stops immediately if a stage fails validation.
+The runner executes all seven stages in order and stops immediately if a stage fails validation.
 
 To resume from a particular stage:
 
 ```powershell
 python scripts\run_preprocessing_pipeline.py --start-at weather
+python scripts\run_preprocessing_pipeline.py --start-at air-quality
 python scripts\run_preprocessing_pipeline.py --start-at holidays
 python scripts\run_preprocessing_pipeline.py --start-at merge
 python scripts\run_preprocessing_pipeline.py --start-at features
@@ -278,6 +286,7 @@ Each stage can also be executed directly from the project root:
 ```powershell
 python src\preprocessing\prepare_monthly_data.py
 python src\preprocessing\prepare_weather_data.py
+python src\preprocessing\prepare_air_quality_data.py
 python src\preprocessing\prepare_holidays_data.py
 python src\preprocessing\merge_contextual_data.py
 python src\demand_forecasting\create_features.py
@@ -334,6 +343,7 @@ Average temperature
 Average minimum temperature
 Average maximum temperature
 Total precipitation
+Average daily shortwave solar radiation
 Observation-day count
 ```
 
@@ -345,7 +355,33 @@ data/raw/contextual/Contextual_Data.xlsx → Weather sheet
 
 This stage requires an internet connection.
 
-## Stage 3 — Prepare holidays
+## Stage 3 — Prepare air quality
+
+Script: `src/preprocessing/prepare_air_quality_data.py`
+
+The stage reads the configured official daily API workbook, derives the required locations from `monthly_demand.csv`, and limits the observations to the client date range. Station names must match the exact client locations, so `Miri, SARAWAK` is used for Miri and the separate `ILP Miri` station is not mixed into it.
+
+It creates these monthly haze indicators:
+
+```text
+Average API
+Maximum API
+Moderate-or-worse days (API >= 51)
+Unhealthy days (API >= 101)
+API observation-day count
+```
+
+The stage rejects missing days, duplicate daily location records, invalid API values, and incomplete location coverage. It never replaces unavailable official API observations with zero or an estimated PM2.5 value.
+
+Output:
+
+```text
+data/raw/contextual/Contextual_Data.xlsx → Air_Quality sheet
+```
+
+When new client dates extend beyond the configured official workbook, obtain the newer API release and update `air_quality_data.file` in `pipeline_config.json`.
+
+## Stage 4 — Prepare holidays
 
 Script: `src/preprocessing/prepare_holidays_data.py`
 
@@ -370,7 +406,7 @@ data/raw/contextual/Contextual_Data.xlsx → Holidays sheet
 
 Keep the `holidays` dependency current when preparing forecasts for a newly announced year. If the government announces an exceptional one-off change not yet included by the package, use `HOLIDAY_ADDITIONS` or `HOLIDAY_REMOVALS` near the top of `prepare_holidays_data.py` and document the official source.
 
-## Stage 4 — Merge contextual data
+## Stage 5 — Merge contextual data
 
 Script: `src/preprocessing/merge_contextual_data.py`
 
@@ -381,11 +417,14 @@ monthly_demand
     LEFT JOIN Weather
     ON month + location
 
+    LEFT JOIN Air_Quality
+    ON month + location
+
     LEFT JOIN Holidays
     ON month
 ```
 
-The stage validates required columns, unique merge keys, valid month values, and contextual completeness. It fails instead of silently producing training rows with missing weather or holidays.
+The stage validates required columns, unique merge keys, valid month values, and contextual completeness. It fails instead of silently producing training rows with missing weather, solar radiation, API, or holidays.
 
 Outputs:
 
@@ -395,7 +434,7 @@ data/processed/shared/monthly_demand_contextual.parquet
 data/processed/shared/monthly_demand_contextual.xlsx
 ```
 
-## Stage 5 — Create historical features
+## Stage 6 — Create historical features
 
 Script: `src/demand_forecasting/create_features.py`
 
@@ -430,7 +469,18 @@ price_lag_3
 rolling_price_mean_3
 ```
 
-All rolling features shift by one month before calculating the statistic. Therefore, the current target value is never included in its own historical feature.
+Historical haze and sunlight features:
+
+```text
+api_lag_1
+rolling_avg_api_3m
+rolling_unhealthy_days_3m
+rolling_solar_radiation_mean_3m
+```
+
+The current origin month also retains average API, maximum API, moderate-or-worse days, unhealthy days, and average daily shortwave radiation. API is treated as a haze and air-quality indicator; solar radiation is the direct sunlight-availability variable.
+
+Demand and price rolling features shift by one month so the current demand or price never enters its own historical feature. Haze and solar rolling features use the known forecast-origin month plus its two preceding months; they never use observations after the forecast origin.
 
 The stage checks that each crop/location series contains complete, unique monthly observations. Rows without the required 12-month history are removed from the model-ready feature table.
 
@@ -442,9 +492,9 @@ data/processed/demand/model_features.parquet
 data/processed/demand/model_features.xlsx
 ```
 
-For the current dataset, 1,620 monthly rows become 1,080 feature rows after the required history is applied.
+For the current dataset, 2,700 monthly rows become 2,160 feature rows after the required history is applied.
 
-## Stage 6 — Create the H1–H12 horizon dataset
+## Stage 7 — Create the H1–H12 horizon dataset
 
 Script: `src/demand_forecasting/create_horizon_dataset.py`
 
@@ -482,6 +532,7 @@ The stage also creates:
 ```text
 target_month_normal_temperature
 target_month_normal_precipitation
+target_month_normal_solar_radiation
 target_month_weather_history_years
 ```
 
@@ -489,7 +540,7 @@ These are historical weather patterns for the target calendar month and location
 
 The calculation is leakage-safe: for a historical forecast made in January 2024, only weather observed on or before January 2024 may contribute to its target-month normal. Weather occurring after the forecast origin is excluded.
 
-The training table does not use actual target-month price, temperature, or rainfall because those values would not be known when making a real future forecast.
+The training table does not use actual target-month price, temperature, rainfall, solar radiation, or API because those values would not be known when making a real future forecast. API features remain anchored to the forecast-origin month and its known history. Solar radiation uses the same leakage-safe target-month historical-normal method as temperature and rainfall.
 
 Outputs:
 
@@ -504,18 +555,18 @@ data/processed/demand/future_horizon_features.csv
 
 `future_horizon_features.csv` contains H1–H12 rows for the latest forecast origin. `future_demand_kg` is empty because it is what the trained model must predict.
 
-For the current dataset, the stage produces 9,450 historical training rows and 540 latest-origin future rows.
+For the current dataset, the stage produces 22,410 historical training rows and 540 latest-origin future rows.
 
 ## Data-leakage rules
 
 The following rules must remain true when the pipeline is changed:
 
 1. Demand and price lags are calculated within the same crop/location series.
-2. Rolling features use `shift(1)` before rolling calculations.
+2. Demand and price rolling features use `shift(1)`; haze and solar rolling features use only the forecast-origin month and earlier observations.
 3. `future_demand_kg` comes only from the target month and is used only as the label.
-4. Actual target-month price, temperature, and rainfall are not model inputs.
+4. Actual target-month price, temperature, rainfall, solar radiation, and API are not model inputs.
 5. Target-month calendar and verified holiday information may be used because they are known beforehand.
-6. Target weather normals use only weather available by the forecast-origin date.
+6. Target weather and solar-radiation normals use only observations available by the forecast-origin date.
 7. Train, validation, and test sets must be separated chronologically, never through random row splitting.
 
 ## Updating the pipeline for new client data
@@ -530,7 +581,7 @@ The following rules must remain true when the pipeline is changed:
 python scripts\run_preprocessing_pipeline.py
 ```
 
-Weather dates, holiday months, lag features, and horizon targets update from the new client date range automatically.
+Weather, solar-radiation, air-quality, holiday, lag-feature, and horizon dates update from the new client date range automatically. The configured official API workbook must already cover every required client day.
 
 ## Important future-prediction note
 

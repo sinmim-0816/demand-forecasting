@@ -62,3 +62,27 @@ def get_client_date_range():
 
     return dates.min().normalize(), dates.max().normalize()
 
+
+def get_air_quality_settings():
+    config = load_config()
+    try:
+        air_quality = config["air_quality_data"]
+        input_file = Path(air_quality["file"])
+        sheet_name = air_quality["sheet"]
+        header_row = int(air_quality["header_row"])
+    except KeyError as error:
+        raise ValueError(
+            f"Missing air-quality configuration setting: {error}"
+        ) from error
+    except (TypeError, ValueError) as error:
+        raise ValueError("air_quality_data.header_row must be an integer.") from error
+
+    if not input_file.is_absolute():
+        input_file = PROJECT_ROOT / input_file
+    if not sheet_name:
+        raise ValueError("air_quality_data.sheet cannot be empty.")
+    if header_row < 1:
+        raise ValueError("air_quality_data.header_row must be at least 1.")
+
+    return input_file, sheet_name, header_row
+
