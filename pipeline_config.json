@@ -8,5 +8,9 @@
     "file": "data/raw/contextual/Fam Sin - Swinburne Uni (4086) (API 2019-2025).xlsx",
     "sheet": "Sheet1",
     "header_row": 3
+  },
+  "fama_price_data": {
+    "file": "data/raw/external/market_prices/DATA HARGA KOMODITI PILIHAN (FAM SIN MIM).xls",
+    "market_level": "LADANG"
   }
 }

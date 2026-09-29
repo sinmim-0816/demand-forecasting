@@ -787,6 +787,8 @@ Price forecasting shares the original procurement, calendar, weather, crop, and 
 ```text
 Shared raw and contextual data
         ↓
+Normalize FAMA Sarawak Ladang prices
+        ↓
 Create origin-based price and demand lag features
         ↓
 Create price H1–H12 rows
@@ -806,22 +808,42 @@ Predict future price in RM/kg
 
 ```text
 data/processed/price/          # Price features, horizons, future rows, splits
-data/external/market_prices/  # Optional FAMA or wholesale market prices
+data/raw/external/market_prices/ # Original read-only FAMA workbook copy
+data/external/market_prices/  # Normalized FAMA data, coverage, and crop mapping
 src/price_forecasting/        # Price-specific source code
 artifacts/price/models/       # Fitted price pipelines
 artifacts/price/predictions/  # Validation, test, and future price predictions
 artifacts/price/reports/      # Metrics, tuning results, and metadata
 ```
 
-### Price stage 1 — create historical features
+### Price stage 1 — prepare FAMA Ladang prices
 
-The platform-only price feature stage is implemented and does not require FAMA data:
+The original FAMA `.xls` workbook is preserved under `data/raw/external/market_prices`. Normalize its `PERINGKAT: LADANG` sections with:
+
+```powershell
+python src\price_forecasting\prepare_fama_price_data.py
+```
+
+This keeps all FAMA commodities for future expansion and creates:
+
+```text
+data/external/market_prices/fama_ladang_prices.csv
+data/external/market_prices/fama_ladang_prices.parquet
+data/external/market_prices/fama_ladang_coverage.csv
+data/external/market_prices/fama_crop_mapping.csv
+```
+
+Only confirmed kilogram-based mappings are enabled for model training. Ambiguous, short-history, missing-Ladang, and unit-mismatched crops remain explicit in the mapping file and are not guessed.
+
+### Price stage 2 — create historical features
+
+Create platform history plus leakage-safe lagged FAMA context:
 
 ```powershell
 python src\price_forecasting\create_price_features.py
 ```
 
-It reads `data/processed/shared/monthly_demand_contextual.csv` and creates leakage-safe price, demand, order, and stock history. The first 12 months of each crop/location series are removed because a valid `price_lag_12` is unavailable. Current output:
+It reads `data/processed/shared/monthly_demand_contextual.csv`, the normalized FAMA table, and the reviewed crop mapping. It creates leakage-safe price, demand, order, stock, and FAMA Ladang history. The FAMA values are lagged by at least one month; the same-month FAMA price is never exposed to the model. The first 12 months of each crop/location series are removed because a valid `price_lag_12` is unavailable. Current output:
 
 ```text
 data/processed/price/price_features.csv
@@ -831,9 +853,9 @@ data/processed/price/price_features.parquet  # when pyarrow is installed
 
 With the current five-year dataset, the stage produces 2,160 rows covering January 2022 through December 2025 for all 45 crop/location series.
 
-Created features include `price_lag_1`, `price_lag_3`, `price_lag_6`, `price_lag_12`, three- and six-month rolling price means, one-month absolute and percentage price changes, lagged demand, rolling demand, lagged order count, lagged stock, and lagged stock-to-demand ratio.
+Created features include `price_lag_1`, `price_lag_3`, `price_lag_6`, `price_lag_12`, three- and six-month rolling price means, one-month absolute and percentage price changes, lagged demand, rolling demand, lagged order count, lagged stock, lagged stock-to-demand ratio, FAMA Ladang lags 1/3/6/12, FAMA rolling means, FAMA price change, and FAMA mapping/availability flags.
 
-### Price stage 2 — create H1–H12 datasets
+### Price stage 3 — create H1–H12 datasets
 
 The price multi-horizon stage is implemented:
 
@@ -856,7 +878,7 @@ With the current data, the training table contains 22,410 labelled rows. The fut
 
 The future template deliberately leaves the future price target empty. It must be passed to a fitted model only after the later model-data preparation and training stages are complete.
 
-### Price stage 3 — prepare chronological model splits
+### Price stage 4 — prepare chronological model splits
 
 The price model-data preparation stage is implemented:
 
@@ -883,7 +905,7 @@ data/processed/price/model_splits/test.csv
 artifacts/price/reports/model_data_split.json
 ```
 
-### Price stage 4 — train XGBoost in Colab
+### Price stage 5 — train XGBoost in Colab
 
 Open and run `notebooks/price_forecasting/train_xgboost.ipynb` in Google Colab. Upload this one training file to Google Drive first:
 
@@ -908,7 +930,7 @@ MyDrive/demand-forecasting/artifacts/price/reports/xgboost_training_metadata.jso
 
 The `.joblib` pipeline is the artifact to use for prediction because it contains both preprocessing and XGBoost. The `.json` file contains only the native XGBoost regressor.
 
-### Price stage 5 — train Extra Trees in Colab
+### Price stage 6 — train Extra Trees in Colab
 
 Open and run `notebooks/price_forecasting/train_etr.ipynb` in Google Colab. It reuses the same uploaded file as XGBoost:
 
@@ -930,7 +952,7 @@ MyDrive/demand-forecasting/artifacts/price/reports/etr_training_metadata.json
 
 Extra Trees produces one `.joblib` model artifact rather than a second native JSON file. The joblib file contains the fitted preprocessor and `ExtraTreesRegressor` together.
 
-### Price stage 6 — compare stacking in Colab
+### Price stage 7 — compare stacking in Colab
 
 After both base-model notebooks finish, open and run `notebooks/price_forecasting/train_stacking_ensemble.ipynb`. It reads these four files directly from Google Drive:
 
@@ -955,7 +977,7 @@ MyDrive/demand-forecasting/artifacts/price/reports/stacking_training_metadata.js
 
 This Ridge stack is an exploratory comparison, not a standalone deployable pipeline. Its validation metric is in-sample, and its two base models were trained on different data amounts for validation and test prediction. A production stack would require time-ordered out-of-fold base predictions and both fitted base pipelines during future forecasting.
 
-### Price stage 7 — predict future prices locally
+### Price stage 8 — predict future prices locally
 
 XGBoost is the selected price model. Open and run `notebooks/price_forecasting/predict_xgboost.ipynb` in the local Jupyter environment. It loads:
 
@@ -990,9 +1012,7 @@ src/price_forecasting/analyze_errors.py
 The intended complete execution order will be:
 
 ```powershell
-python src\price_forecasting\create_price_features.py
-python src\price_forecasting\create_price_horizon_dataset.py
-python src\price_forecasting\prepare_model_data.py
+python scripts\run_price_preprocessing_pipeline.py
 # Run notebooks/price_forecasting/train_xgboost.ipynb in Google Colab
 python src\price_forecasting\tune_xgboost.py --trials 12 --folds 3 --validation-months 3
 # Run notebooks/price_forecasting/train_etr.ipynb in Google Colab

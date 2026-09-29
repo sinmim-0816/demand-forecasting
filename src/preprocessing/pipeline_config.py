@@ -86,3 +86,22 @@ def get_air_quality_settings():
 
     return input_file, sheet_name, header_row
 
+
+def get_fama_price_settings():
+    config = load_config()
+    try:
+        fama = config["fama_price_data"]
+        input_file = Path(fama["file"])
+        market_level = str(fama["market_level"]).strip().upper()
+    except KeyError as error:
+        raise ValueError(
+            f"Missing FAMA price configuration setting: {error}"
+        ) from error
+
+    if not input_file.is_absolute():
+        input_file = PROJECT_ROOT / input_file
+    if not market_level:
+        raise ValueError("fama_price_data.market_level cannot be empty.")
+
+    return input_file, market_level
+

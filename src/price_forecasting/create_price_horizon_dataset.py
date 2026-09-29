@@ -323,8 +323,14 @@ def create_prediction_template(horizon_data):
 def save_outputs(training, prediction_template):
     PRICE_DIR.mkdir(parents=True, exist_ok=True)
     training.to_csv(TRAINING_CSV, index=False)
-    training.to_excel(TRAINING_EXCEL, index=False)
     prediction_template.to_csv(PREDICTION_TEMPLATE_CSV, index=False)
+
+    excel_saved = True
+    try:
+        training.to_excel(TRAINING_EXCEL, index=False)
+    except OSError as error:
+        excel_saved = False
+        print(f"Excel skipped because the output file is unavailable: {error}")
 
     parquet_saved = True
     try:
@@ -336,14 +342,15 @@ def save_outputs(training, prediction_template):
     print(f"Price training rows: {len(training):,}")
     print(f"Future price prediction-template rows: {len(prediction_template):,}")
     print(f"Saved: {TRAINING_CSV}")
-    print(f"Saved: {TRAINING_EXCEL}")
+    if excel_saved:
+        print(f"Saved: {TRAINING_EXCEL}")
     print(f"Saved: {PREDICTION_TEMPLATE_CSV}")
     if parquet_saved:
         print(f"Saved: {TRAINING_PARQUET}")
 
 
 def main():
-    print("Creating platform-only price H1-H12 dataset...")
+    print("Creating price H1-H12 dataset with lagged FAMA context...")
     features, contextual, holiday_calendar = load_inputs()
     horizon_data = build_horizon_dataset(features, contextual, holiday_calendar)
     training = create_training_dataset(horizon_data)

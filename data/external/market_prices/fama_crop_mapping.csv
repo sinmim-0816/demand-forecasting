@@ -1,0 +1,16 @@
+platform_crop,fama_commodity,fama_category,required_unit,mapping_status,use_in_price_model,reason
+Bittergourd,PERIA,SAYUR,KG,confirmed,true,Exact commodity match with complete monthly Ladang history
+Cabbage,,SAYUR,KG,no_ladang_series,false,FAMA workbook has no usable Ladang cabbage series
+Choysum,,SAYUR,KG,ambiguous,false,SAWI HIJAU cannot safely distinguish Choysum from Leafmustard
+Cucumber,TIMUN HIJAU,SAYUR,KG,confirmed,true,Exact commodity match with complete monthly Ladang history
+Eggplant,TERUNG PANJANG / PEPARU (TANAH RENDAH),SAYUR,KG,confirmed,true,Best explicit lowland long eggplant match with complete monthly history
+Kangkung,KANGKUNG,SAYUR,KG,confirmed,true,Exact commodity match with complete monthly Ladang history
+Leafmustard,,SAYUR,KG,ambiguous,false,SAWI HIJAU cannot safely distinguish Leafmustard from Choysum
+Lettuce,SALAD,SAYUR,KG,insufficient_history,false,Ladang series contains too little history for reliable lag features
+Longbean,KACANG PANJANG HIJAU,SAYUR,KG,confirmed,true,Exact green long-bean match with complete monthly Ladang history
+Okra,KACANG BENDI,SAYUR,KG,confirmed,true,Exact commodity match with complete monthly Ladang history
+Pumpkin,LABU MANIS,SAYUR,KG,confirmed,true,Exact sweet-pumpkin match with complete monthly Ladang history
+Redchilli,,SAYUR,KG,ambiguous,false,Workbook contains multiple red-chilli varieties and the platform variety is unknown
+Spinach,BAYAM,SAYUR,KG,confirmed,true,Exact commodity match with complete monthly Ladang history
+Sweetcorn,JAGUNG MANIS,KONTAN,KG,unit_mismatch,false,FAMA price is per TONGKOL rather than per kilogram
+Tomato,TOMATO (TANAH TINGGI),SAYUR,KG,insufficient_history,false,Ladang series is highland-specific and has insufficient monthly history

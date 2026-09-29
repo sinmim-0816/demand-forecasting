@@ -2,6 +2,7 @@ matplotlib
 seaborn
 numpy
 openpyxl
+xlrd>=2.0,<3
 pandas
 pyarrow
 scikit-learn==1.6.1
