@@ -34,6 +34,13 @@ ORIGIN_AIR_QUALITY_COLUMNS = [
     "api_observation_days",
 ]
 SOLAR_COLUMN = "avg_daily_shortwave_radiation_mj_m2"
+REMOVED_MODEL_COLUMNS = [
+    "supermarket_order_count",
+    "trader_order_count",
+    "total_stock_available_kg",
+    "avg_stock_coverage_ratio",
+    "stock_to_demand_ratio",
+]
 HOLIDAY_RENAME_MAP = {
     "Month": "month",
     "Public Holiday Count": "public_holiday_count",
@@ -99,6 +106,16 @@ def load_inputs():
         "Contextual dataset",
     )
     require_columns(holiday_calendar, HOLIDAY_RENAME_MAP, "Holiday calendar")
+
+    unexpected_removed_columns = [
+        column for column in REMOVED_MODEL_COLUMNS if column in features.columns
+    ]
+    if unexpected_removed_columns:
+        raise ValueError(
+            "Removed fields are still present in the demand feature dataset: "
+            + ", ".join(unexpected_removed_columns)
+            + ". Rerun create_features.py before creating horizons."
+        )
 
     holiday_calendar = holiday_calendar[list(HOLIDAY_RENAME_MAP)].rename(
         columns=HOLIDAY_RENAME_MAP

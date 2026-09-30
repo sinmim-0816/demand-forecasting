@@ -29,6 +29,11 @@ FAMA_PRICE_LAGS = [1, 3, 6, 12]
 REMOVED_MODEL_COLUMNS = [
     "supermarket_order_count",
     "trader_order_count",
+    "total_stock_available_kg",
+    "avg_stock_coverage_ratio",
+    "stock_to_demand_ratio",
+    "stock_available_lag_1",
+    "stock_to_demand_ratio_lag_1",
 ]
 
 
@@ -49,8 +54,6 @@ def load_data():
         PRICE_COLUMN,
         "demand_kg",
         "order_count",
-        "total_stock_available_kg",
-        "stock_to_demand_ratio",
     ]
     missing = [column for column in required if column not in data.columns]
     if missing:
@@ -196,12 +199,6 @@ def create_features(data):
     featured["order_count_lag_1"] = featured.groupby(
         GROUP_COLUMNS, sort=False
     )["order_count"].shift(1)
-    featured["stock_available_lag_1"] = featured.groupby(
-        GROUP_COLUMNS, sort=False
-    )["total_stock_available_kg"].shift(1)
-    featured["stock_to_demand_ratio_lag_1"] = featured.groupby(
-        GROUP_COLUMNS, sort=False
-    )["stock_to_demand_ratio"].shift(1)
 
     return featured
 
@@ -279,8 +276,6 @@ def keep_model_ready_rows(featured):
         "demand_lag_3",
         "rolling_demand_mean_3",
         "order_count_lag_1",
-        "stock_available_lag_1",
-        "stock_to_demand_ratio_lag_1",
     ]
     featured = featured.replace([np.inf, -np.inf], np.nan)
     model_ready = featured.dropna(subset=required_history).copy()

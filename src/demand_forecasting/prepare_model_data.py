@@ -41,6 +41,9 @@ EXCLUDED_FEATURES = [
 REMOVED_MODEL_COLUMNS = [
     "supermarket_order_count",
     "trader_order_count",
+    "total_stock_available_kg",
+    "avg_stock_coverage_ratio",
+    "stock_to_demand_ratio",
 ]
 
 
@@ -79,13 +82,13 @@ def load_horizon_data():
     if data[TARGET_COLUMN].isna().any():
         raise ValueError("Training data contains rows without a valid future target.")
 
-    unexpected_order_type_columns = [
+    unexpected_removed_columns = [
         column for column in REMOVED_MODEL_COLUMNS if column in data.columns
     ]
-    if unexpected_order_type_columns:
+    if unexpected_removed_columns:
         raise ValueError(
-            "Removed order-type fields are still present in demand model data: "
-            + ", ".join(unexpected_order_type_columns)
+            "Removed fields are still present in demand model data: "
+            + ", ".join(unexpected_removed_columns)
             + ". Rerun the demand preprocessing pipeline from the features stage."
         )
 

@@ -27,6 +27,9 @@ SOLAR_COLUMN = "avg_daily_shortwave_radiation_mj_m2"
 REMOVED_MODEL_COLUMNS = [
     "supermarket_order_count",
     "trader_order_count",
+    "total_stock_available_kg",
+    "avg_stock_coverage_ratio",
+    "stock_to_demand_ratio",
 ]
 
 

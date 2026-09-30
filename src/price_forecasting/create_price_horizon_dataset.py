@@ -41,6 +41,15 @@ ORIGIN_AIR_QUALITY_COLUMNS = [
     "api_observation_days",
 ]
 SOLAR_COLUMN = "avg_daily_shortwave_radiation_mj_m2"
+REMOVED_MODEL_COLUMNS = [
+    "supermarket_order_count",
+    "trader_order_count",
+    "total_stock_available_kg",
+    "avg_stock_coverage_ratio",
+    "stock_to_demand_ratio",
+    "stock_available_lag_1",
+    "stock_to_demand_ratio_lag_1",
+]
 HOLIDAY_RENAME_MAP = {
     "Month": "month",
     "Public Holiday Count": "public_holiday_count",
@@ -104,6 +113,16 @@ def load_inputs():
     )
     require_columns(holiday_calendar, list(HOLIDAY_RENAME_MAP), "Holiday calendar")
 
+    unexpected_removed_columns = [
+        column for column in REMOVED_MODEL_COLUMNS if column in features.columns
+    ]
+    if unexpected_removed_columns:
+        raise ValueError(
+            "Removed fields are still present in the price feature dataset: "
+            + ", ".join(unexpected_removed_columns)
+            + ". Rerun create_price_features.py before creating horizons."
+        )
+
     if features.duplicated(["month", *GROUP_COLUMNS]).any():
         raise ValueError("Price feature data contains duplicate crop/location/month rows.")
     if contextual.duplicated(["month", *GROUP_COLUMNS]).any():
@@ -145,9 +164,6 @@ def expand_horizons(features):
         PRICE_COLUMN: "origin_weighted_avg_procurement_price_rm_per_kg",
         "demand_kg": "origin_demand_kg",
         "order_count": "origin_order_count",
-        "total_stock_available_kg": "origin_total_stock_available_kg",
-        "avg_stock_coverage_ratio": "origin_avg_stock_coverage_ratio",
-        "stock_to_demand_ratio": "origin_stock_to_demand_ratio",
         "avg_temperature_c": "origin_avg_temperature_c",
         "avg_min_temperature_c": "origin_avg_min_temperature_c",
         "avg_max_temperature_c": "origin_avg_max_temperature_c",
