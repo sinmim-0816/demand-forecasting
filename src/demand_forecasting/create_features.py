@@ -24,6 +24,10 @@ AIR_QUALITY_COLUMNS = [
     "unhealthy_days",
 ]
 SOLAR_COLUMN = "avg_daily_shortwave_radiation_mj_m2"
+REMOVED_MODEL_COLUMNS = [
+    "supermarket_order_count",
+    "trader_order_count",
+]
 
 
 def load_data():
@@ -145,6 +149,7 @@ def keep_model_ready_rows(featured):
     # Infinite values cannot be consumed safely by the modelling stage.
     featured = featured.replace([np.inf, -np.inf], np.nan)
     model_ready = featured.dropna(subset=required_history).copy()
+    model_ready = model_ready.drop(columns=REMOVED_MODEL_COLUMNS, errors="ignore")
     return model_ready, required_history
 
 

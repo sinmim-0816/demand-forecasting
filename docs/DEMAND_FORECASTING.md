@@ -48,6 +48,8 @@ Main values include demand, weighted procurement price, order count, completed/c
 
 `src/demand_forecasting/create_features.py` creates historical demand, price, stock, and rolling features. Lag values stay anchored to the forecast-origin month.
 
+`supermarket_order_count` and `trader_order_count` remain available in the shared monthly table for reporting, but are deliberately removed from the demand model contract because CropWise cannot observe a reliable order type.
+
 ### H1-H12 transformation
 
 `src/demand_forecasting/create_horizon_dataset.py` expands each forecast origin into 12 rows and adds:

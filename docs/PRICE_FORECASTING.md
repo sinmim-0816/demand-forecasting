@@ -48,6 +48,8 @@ Current confirmed mappings are Bittergourd, Cucumber, Eggplant, Kangkung, Longbe
 
 FAMA is contextual data. The current-month FAMA value is not exposed to the model; the minimum FAMA lag is one month.
 
+`supermarket_order_count` and `trader_order_count` remain available in the shared monthly table for reporting, but are deliberately removed from the price model contract because CropWise cannot observe a reliable order type.
+
 The first 12 months of each crop/location series are removed because `price_lag_12` does not yet exist.
 
 ## H1-H12 transformation

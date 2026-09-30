@@ -44,6 +44,11 @@ EXCLUDED_FEATURES = [
     TARGET_COLUMN,
 ]
 
+REMOVED_MODEL_COLUMNS = [
+    "supermarket_order_count",
+    "trader_order_count",
+]
+
 
 # Load and validate the price horizon dataset
 
@@ -79,6 +84,16 @@ def load_horizon_data():
 
     if data[TARGET_COLUMN].isna().any():
         raise ValueError("Price training data contains rows without a valid target.")
+
+    unexpected_order_type_columns = [
+        column for column in REMOVED_MODEL_COLUMNS if column in data.columns
+    ]
+    if unexpected_order_type_columns:
+        raise ValueError(
+            "Removed order-type fields are still present in price model data: "
+            + ", ".join(unexpected_order_type_columns)
+            + ". Rerun the price preprocessing pipeline from the features stage."
+        )
 
     duplicate_keys = [
         "forecast_origin_month",

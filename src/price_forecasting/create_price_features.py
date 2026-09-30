@@ -26,6 +26,10 @@ PRICE_LAGS = [1, 3, 6, 12]
 DEMAND_LAGS = [1, 3]
 FAMA_PRICE_COLUMN = "fama_ladang_price_rm_per_unit"
 FAMA_PRICE_LAGS = [1, 3, 6, 12]
+REMOVED_MODEL_COLUMNS = [
+    "supermarket_order_count",
+    "trader_order_count",
+]
 
 
 # Load and validate the shared monthly table
@@ -279,7 +283,9 @@ def keep_model_ready_rows(featured):
         "stock_to_demand_ratio_lag_1",
     ]
     featured = featured.replace([np.inf, -np.inf], np.nan)
-    return featured.dropna(subset=required_history).copy(), required_history
+    model_ready = featured.dropna(subset=required_history).copy()
+    model_ready = model_ready.drop(columns=REMOVED_MODEL_COLUMNS, errors="ignore")
+    return model_ready, required_history
 
 
 # Save price features separately from demand features
