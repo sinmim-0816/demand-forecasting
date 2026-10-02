@@ -44,8 +44,8 @@ demand-forecasting/
 │   ├── external/market_prices/
 │   ├── processed/
 │   │   ├── shared/
-│   │   ├── demand/
-│   │   └── price/
+│   │   ├── demand/{core,full}/
+│   │   └── price/{core,full}/
 │   └── recommendation/
 ├── scripts/
 │   ├── run_preprocessing_pipeline.py
@@ -62,8 +62,8 @@ demand-forecasting/
 │   ├── demand_forecasting/
 │   └── price_forecasting/
 ├── artifacts/
-│   ├── demand/
-│   ├── price/
+│   ├── demand/{core,full}/
+│   ├── price/{core,full}/
 │   └── recommendation/
 └── tests/
 ```
@@ -76,8 +76,8 @@ demand-forecasting/
 | `data/raw/external/market_prices` | Preserved original FAMA workbooks. |
 | `data/external/market_prices` | Normalized FAMA tables, coverage reports, and reviewed mappings. |
 | `data/processed/shared` | Reusable monthly demand, price, weather, solar, haze, and holiday context. |
-| `data/processed/demand` | Demand features, horizon rows, future rows, and chronological splits. |
-| `data/processed/price` | Price features, horizon rows, future rows, and chronological splits. |
+| `data/processed/demand/{core,full}` | Separate demand feature contracts, horizon rows, future rows, and splits. |
+| `data/processed/price/{core,full}` | Separate price feature contracts, horizon rows, future rows, and splits. |
 | `data/recommendation` | Temporary JSON/CSV inputs used before API and database integration. |
 | `src/preprocessing` | Shared cleaning and contextual-data preparation. |
 | `src/demand_forecasting` | Demand-specific feature engineering, splitting, tuning, and prediction. |
@@ -101,7 +101,10 @@ demand-forecasting/
 
 For a forecast made at an origin month:
 
-- Historical price, demand, stock, weather, haze, solar, and FAMA values must come from the origin month or earlier.
+- Historical price, demand, weather, solar, and FAMA values must come from the origin month or earlier.
+- Both variants exclude the unreliable order-level stock feature family.
+- Demand full uses AQ; demand core excludes AQ.
+- Price full uses AQ plus FAMA; price core excludes both.
 - FAMA prices are lagged by at least one month.
 - Target-month calendar and holiday fields are allowed because they are known beforehand.
 - Target weather uses historical normals, not actual future observations.
@@ -118,9 +121,21 @@ NestJS business API and Supabase
         v
 Python FastAPI AI service
         |
-        +-- demand model
-        +-- price model
+        +-- demand full/core selector
+        +-- price full/core selector per crop
         +-- recommendation engine
 ```
 
 The NestJS API should own authentication, farms, planting records, and authorization. The Python service should own model loading, forecasting, and recommendation calculations.
+
+## Runtime model selection
+
+```text
+Forecast request
+    -> validate core history
+    -> validate optional AQ and FAMA context
+    -> full context ready? use full
+    -> otherwise use core and return a warning
+```
+
+Demand selects one variant for the request. Price selection is per crop because FAMA coverage differs by crop. The reusable readiness logic is in `src/prediction/model_variant_selector.py`.

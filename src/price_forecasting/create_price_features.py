@@ -1,3 +1,4 @@
+import argparse
 from pathlib import Path
 
 import numpy as np
@@ -8,14 +9,10 @@ import pandas as pd
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SHARED_DIR = PROJECT_ROOT / "data" / "processed" / "shared"
-PRICE_DIR = PROJECT_ROOT / "data" / "processed" / "price"
 FAMA_DIR = PROJECT_ROOT / "data" / "external" / "market_prices"
 INPUT_FILE = SHARED_DIR / "monthly_demand_contextual.csv"
 FAMA_PRICE_FILE = FAMA_DIR / "fama_ladang_prices.csv"
 FAMA_MAPPING_FILE = FAMA_DIR / "fama_crop_mapping.csv"
-OUTPUT_CSV = PRICE_DIR / "price_features.csv"
-OUTPUT_PARQUET = PRICE_DIR / "price_features.parquet"
-OUTPUT_EXCEL = PRICE_DIR / "price_features.xlsx"
 
 
 # Feature settings
@@ -26,7 +23,7 @@ PRICE_LAGS = [1, 3, 6, 12]
 DEMAND_LAGS = [1, 3]
 FAMA_PRICE_COLUMN = "fama_ladang_price_rm_per_unit"
 FAMA_PRICE_LAGS = [1, 3, 6, 12]
-REMOVED_MODEL_COLUMNS = [
+ALWAYS_REMOVED_MODEL_COLUMNS = [
     "supermarket_order_count",
     "trader_order_count",
     "total_stock_available_kg",
@@ -35,6 +32,23 @@ REMOVED_MODEL_COLUMNS = [
     "stock_available_lag_1",
     "stock_to_demand_ratio_lag_1",
 ]
+AIR_QUALITY_COLUMNS = [
+    "avg_api",
+    "max_api",
+    "moderate_or_worse_days",
+    "unhealthy_days",
+    "api_observation_days",
+]
+VALID_VARIANTS = ("core", "full")
+
+
+def output_paths(variant):
+    output_dir = PROJECT_ROOT / "data" / "processed" / "price" / variant
+    return (
+        output_dir / "price_features.csv",
+        output_dir / "price_features.parquet",
+        output_dir / "price_features.xlsx",
+    )
 
 
 # Load and validate the shared monthly table
@@ -262,7 +276,7 @@ def add_fama_features(featured, fama_context):
 
 # Remove only rows that lack the minimum 12-month history
 
-def keep_model_ready_rows(featured):
+def keep_model_ready_rows(featured, variant="core"):
     required_history = [
         "price_lag_1",
         "price_lag_3",
@@ -279,46 +293,52 @@ def keep_model_ready_rows(featured):
     ]
     featured = featured.replace([np.inf, -np.inf], np.nan)
     model_ready = featured.dropna(subset=required_history).copy()
-    model_ready = model_ready.drop(columns=REMOVED_MODEL_COLUMNS, errors="ignore")
+    removed_columns = list(ALWAYS_REMOVED_MODEL_COLUMNS)
+    if variant == "core":
+        removed_columns.extend(AIR_QUALITY_COLUMNS)
+    model_ready = model_ready.drop(columns=removed_columns, errors="ignore")
     return model_ready, required_history
 
 
 # Save price features separately from demand features
 
-def save_outputs(model_ready):
-    PRICE_DIR.mkdir(parents=True, exist_ok=True)
-    model_ready.to_csv(OUTPUT_CSV, index=False)
+def save_outputs(model_ready, variant):
+    output_csv, output_parquet, output_excel = output_paths(variant)
+    output_csv.parent.mkdir(parents=True, exist_ok=True)
+    model_ready.to_csv(output_csv, index=False)
 
     excel_saved = True
     try:
-        model_ready.to_excel(OUTPUT_EXCEL, index=False)
+        model_ready.to_excel(output_excel, index=False)
     except OSError as error:
         excel_saved = False
         print(f"Excel skipped because the output file is unavailable: {error}")
 
     parquet_saved = True
     try:
-        model_ready.to_parquet(OUTPUT_PARQUET, index=False)
+        model_ready.to_parquet(output_parquet, index=False)
     except ImportError:
         parquet_saved = False
         print("Parquet skipped: install pyarrow to enable Parquet output.")
 
     print(f"Price-feature rows: {len(model_ready):,}")
-    print(f"Saved: {OUTPUT_CSV}")
+    print(f"Saved: {output_csv}")
     if excel_saved:
-        print(f"Saved: {OUTPUT_EXCEL}")
+        print(f"Saved: {output_excel}")
     if parquet_saved:
-        print(f"Saved: {OUTPUT_PARQUET}")
+        print(f"Saved: {output_parquet}")
 
 
-def main():
-    print("Creating leakage-safe platform and FAMA price features...")
+def main(variant="core"):
+    if variant not in VALID_VARIANTS:
+        raise ValueError(f"Variant must be one of: {', '.join(VALID_VARIANTS)}")
+    print(f"Creating leakage-safe price features ({variant} variant)...")
     data = load_data()
-    fama_context = load_fama_context()
     validate_complete_monthly_series(data)
     featured = create_features(data)
-    featured = add_fama_features(featured, fama_context)
-    model_ready, required_history = keep_model_ready_rows(featured)
+    if variant == "full":
+        featured = add_fama_features(featured, load_fama_context())
+    model_ready, required_history = keep_model_ready_rows(featured, variant)
 
     removed = len(featured) - len(model_ready)
     print(f"Rows removed because 12-month history is unavailable: {removed:,}")
@@ -327,15 +347,18 @@ def main():
     if model_ready[required_history].isna().any().any():
         raise ValueError("Price feature output still contains missing required history.")
 
-    mapped_rows = int(model_ready["fama_ladang_mapped"].sum())
-    print(
-        f"Rows with a confirmed FAMA crop mapping: {mapped_rows:,} / "
-        f"{len(model_ready):,}"
-    )
+    if variant == "full":
+        mapped_rows = int(model_ready["fama_ladang_mapped"].sum())
+        print(
+            f"Rows with a confirmed FAMA crop mapping: {mapped_rows:,} / "
+            f"{len(model_ready):,}"
+        )
 
-    save_outputs(model_ready)
+    save_outputs(model_ready, variant)
     print("PRICE FEATURE CREATION COMPLETE")
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--variant", choices=VALID_VARIANTS, default="core")
+    main(parser.parse_args().variant)

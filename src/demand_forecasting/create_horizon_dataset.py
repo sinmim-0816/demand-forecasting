@@ -1,3 +1,4 @@
+import argparse
 from pathlib import Path
 
 import numpy as np
@@ -6,15 +7,8 @@ import pandas as pd
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 SHARED_DIR = PROJECT_ROOT / "data" / "processed" / "shared"
-PROCESSED_DIR = PROJECT_ROOT / "data" / "processed" / "demand"
-FEATURES_FILE = PROCESSED_DIR / "model_features.csv"
 CONTEXTUAL_FILE = SHARED_DIR / "monthly_demand_contextual.csv"
 HOLIDAY_FILE = PROJECT_ROOT / "data" / "raw" / "contextual" / "Contextual_Data.xlsx"
-
-TRAINING_CSV = PROCESSED_DIR / "horizon_training_dataset.csv"
-TRAINING_PARQUET = PROCESSED_DIR / "horizon_training_dataset.parquet"
-TRAINING_EXCEL = PROCESSED_DIR / "horizon_training_dataset.xlsx"
-PREDICTION_TEMPLATE_CSV = PROCESSED_DIR / "future_horizon_features.csv"
 
 GROUP_COLUMNS = ["crop", "location"]
 HORIZONS = range(1, 13)
@@ -26,21 +20,25 @@ TARGET_HOLIDAY_COLUMNS = [
     "christmas",
     "major_festival",
 ]
-ORIGIN_AIR_QUALITY_COLUMNS = [
-    "avg_api",
-    "max_api",
-    "moderate_or_worse_days",
-    "unhealthy_days",
-    "api_observation_days",
-]
 SOLAR_COLUMN = "avg_daily_shortwave_radiation_mj_m2"
-REMOVED_MODEL_COLUMNS = [
+ALWAYS_REMOVED_MODEL_COLUMNS = [
     "supermarket_order_count",
     "trader_order_count",
     "total_stock_available_kg",
     "avg_stock_coverage_ratio",
     "stock_to_demand_ratio",
 ]
+AIR_QUALITY_COLUMNS = [
+    "avg_api",
+    "max_api",
+    "moderate_or_worse_days",
+    "unhealthy_days",
+    "api_observation_days",
+    "api_lag_1",
+    "rolling_avg_api_3m",
+    "rolling_unhealthy_days_3m",
+]
+VALID_VARIANTS = ("core", "full")
 HOLIDAY_RENAME_MAP = {
     "Month": "month",
     "Public Holiday Count": "public_holiday_count",
@@ -60,10 +58,23 @@ def require_columns(df, required, dataset_name):
         )
 
 
-def load_inputs():
-    if not FEATURES_FILE.exists():
+def variant_paths(variant):
+    processed_dir = PROJECT_ROOT / "data" / "processed" / "demand" / variant
+    return {
+        "features": processed_dir / "model_features.csv",
+        "training_csv": processed_dir / "horizon_training_dataset.csv",
+        "training_parquet": processed_dir / "horizon_training_dataset.parquet",
+        "training_excel": processed_dir / "horizon_training_dataset.xlsx",
+        "prediction_template": processed_dir / "future_horizon_features.csv",
+    }
+
+
+def load_inputs(variant):
+    paths = variant_paths(variant)
+    features_file = paths["features"]
+    if not features_file.exists():
         raise FileNotFoundError(
-            f"Feature dataset cannot be found:\n{FEATURES_FILE}\n"
+            f"Feature dataset cannot be found:\n{features_file}\n"
             "Run src/preprocessing/create_features.py first."
         )
     if not CONTEXTUAL_FILE.exists():
@@ -77,7 +88,7 @@ def load_inputs():
             "Run src/preprocessing/prepare_holidays_data.py first."
         )
 
-    features = pd.read_csv(FEATURES_FILE, parse_dates=["month"])
+    features = pd.read_csv(features_file, parse_dates=["month"])
     contextual = pd.read_csv(CONTEXTUAL_FILE, parse_dates=["month"])
     holiday_calendar = pd.read_excel(
         HOLIDAY_FILE,
@@ -100,16 +111,16 @@ def load_inputs():
             "avg_temperature_c",
             "total_precipitation_mm",
             SOLAR_COLUMN,
-            *ORIGIN_AIR_QUALITY_COLUMNS,
             *TARGET_HOLIDAY_COLUMNS,
         ],
         "Contextual dataset",
     )
     require_columns(holiday_calendar, HOLIDAY_RENAME_MAP, "Holiday calendar")
 
-    unexpected_removed_columns = [
-        column for column in REMOVED_MODEL_COLUMNS if column in features.columns
-    ]
+    removed_columns = list(ALWAYS_REMOVED_MODEL_COLUMNS)
+    if variant == "core":
+        removed_columns.extend(AIR_QUALITY_COLUMNS)
+    unexpected_removed_columns = [column for column in removed_columns if column in features]
     if unexpected_removed_columns:
         raise ValueError(
             "Removed fields are still present in the demand feature dataset: "
@@ -159,11 +170,11 @@ def expand_horizons(features):
         "month_number": "origin_month_number",
         "quarter": "origin_quarter",
         "season": "origin_season",
-        **{
-            column: f"origin_{column}"
-            for column in ORIGIN_AIR_QUALITY_COLUMNS
-            if column in features.columns
-        },
+        "avg_api": "origin_avg_api",
+        "max_api": "origin_max_api",
+        "moderate_or_worse_days": "origin_moderate_or_worse_days",
+        "unhealthy_days": "origin_unhealthy_days",
+        "api_observation_days": "origin_api_observation_days",
         **{
             column: f"origin_{column}"
             for column in TARGET_HOLIDAY_COLUMNS
@@ -324,34 +335,38 @@ def create_prediction_template(horizon_data):
     ].reset_index(drop=True)
 
 
-def save_outputs(training, prediction_template):
-    training.to_csv(TRAINING_CSV, index=False)
-    training.to_excel(TRAINING_EXCEL, index=False)
-    prediction_template.to_csv(PREDICTION_TEMPLATE_CSV, index=False)
+def save_outputs(training, prediction_template, variant):
+    paths = variant_paths(variant)
+    paths["training_csv"].parent.mkdir(parents=True, exist_ok=True)
+    training.to_csv(paths["training_csv"], index=False)
+    training.to_excel(paths["training_excel"], index=False)
+    prediction_template.to_csv(paths["prediction_template"], index=False)
 
     parquet_saved = True
     try:
-        training.to_parquet(TRAINING_PARQUET, index=False)
+        training.to_parquet(paths["training_parquet"], index=False)
     except ImportError:
         parquet_saved = False
         print("Parquet skipped: install pyarrow to enable Parquet output.")
 
     print(f"Training rows: {len(training):,}")
     print(f"Future prediction-template rows: {len(prediction_template):,}")
-    print(f"Saved: {TRAINING_CSV}")
-    print(f"Saved: {TRAINING_EXCEL}")
-    print(f"Saved: {PREDICTION_TEMPLATE_CSV}")
+    print(f"Saved: {paths['training_csv']}")
+    print(f"Saved: {paths['training_excel']}")
+    print(f"Saved: {paths['prediction_template']}")
     if parquet_saved:
-        print(f"Saved: {TRAINING_PARQUET}")
+        print(f"Saved: {paths['training_parquet']}")
 
 
-def main():
-    print("Creating global direct multi-horizon H1-H12 dataset...")
-    features, contextual, holiday_calendar = load_inputs()
+def main(variant="core"):
+    if variant not in VALID_VARIANTS:
+        raise ValueError(f"Variant must be one of: {', '.join(VALID_VARIANTS)}")
+    print(f"Creating demand H1-H12 dataset ({variant} variant)...")
+    features, contextual, holiday_calendar = load_inputs(variant)
     horizon_data = build_horizon_dataset(features, contextual, holiday_calendar)
     training = create_training_dataset(horizon_data)
     prediction_template = create_prediction_template(horizon_data)
-    save_outputs(training, prediction_template)
+    save_outputs(training, prediction_template, variant)
 
     missing_future_holidays = prediction_template[
         [f"target_{column}" for column in TARGET_HOLIDAY_COLUMNS]
@@ -367,4 +382,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--variant", choices=VALID_VARIANTS, default="core")
+    main(parser.parse_args().variant)

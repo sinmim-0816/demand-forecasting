@@ -104,9 +104,10 @@ def run_tuning(
     validation_months=3,
     device="cpu",
     evaluate_test=False,
+    variant="core",
 ):
     project_root = Path(project_root).expanduser().resolve()
-    splits = load_splits(project_root)
+    splits = load_splits(project_root, variant)
     pretest = pd.concat([splits["train"], splits["validation"]], ignore_index=True)
     pretest = pretest.sort_values("target_month").reset_index(drop=True)
     feature_columns, numeric_features = select_model_columns(pretest)
@@ -151,9 +152,10 @@ def run_tuning(
         pretest, feature_columns, numeric_features, best_params, device
     )
 
-    model_dir = project_root / "artifacts" / "demand" / "models"
-    report_dir = project_root / "artifacts" / "demand" / "reports"
-    prediction_dir = project_root / "artifacts" / "demand" / "predictions"
+    artifact_root = project_root / "artifacts" / "demand" / variant
+    model_dir = artifact_root / "models"
+    report_dir = artifact_root / "reports"
+    prediction_dir = artifact_root / "predictions"
     for directory in (model_dir, report_dir, prediction_dir):
         directory.mkdir(parents=True, exist_ok=True)
 
@@ -168,6 +170,12 @@ def run_tuning(
     pd.DataFrame(fold_records).to_csv(folds_file, index=False)
 
     metadata = {
+        "model_version": f"{variant}_v1",
+        "model_variant": variant,
+        "requires_air_quality": variant == "full",
+        "requires_fama": False,
+        "air_quality_used": variant == "full",
+        "stock_used": False,
         "selected_candidate": best_name,
         "selected_parameters": {**XGBOOST_PARAMS, **best_params, "device": device},
         "selection_metric": "mean_fold_wape",
@@ -220,6 +228,7 @@ def parse_args():
     parser.add_argument("--folds", type=int, default=3)
     parser.add_argument("--validation-months", type=int, default=3)
     parser.add_argument("--device", choices=["cpu", "cuda"], default="cpu")
+    parser.add_argument("--variant", choices=["core", "full"], default="core")
     parser.add_argument(
         "--evaluate-test",
         action="store_true",
@@ -240,6 +249,7 @@ def main():
         validation_months=args.validation_months,
         device=args.device,
         evaluate_test=args.evaluate_test,
+        variant=args.variant,
     )
     print("\nXGBOOST TUNING COMPLETE")
     print(result["leaderboard"].head(5).to_string(index=False))

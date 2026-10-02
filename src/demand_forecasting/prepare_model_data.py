@@ -1,3 +1,4 @@
+import argparse
 import json
 from pathlib import Path
 
@@ -7,11 +8,6 @@ import pandas as pd
 # Project paths
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-INPUT_FILE = PROJECT_ROOT / "data" / "processed" / "demand" / "horizon_training_dataset.csv"
-SPLIT_DIR = PROJECT_ROOT / "data" / "processed" / "demand" / "model_splits"
-REPORT_DIR = PROJECT_ROOT / "artifacts" / "demand" / "reports"
-
-
 # Split settings
 
 VALIDATION_MONTHS = 3
@@ -38,26 +34,53 @@ EXCLUDED_FEATURES = [
     TARGET_COLUMN,
 ]
 
-REMOVED_MODEL_COLUMNS = [
+ALWAYS_REMOVED_MODEL_COLUMNS = [
     "supermarket_order_count",
     "trader_order_count",
     "total_stock_available_kg",
     "avg_stock_coverage_ratio",
     "stock_to_demand_ratio",
 ]
+AIR_QUALITY_COLUMNS = [
+    "avg_api",
+    "max_api",
+    "moderate_or_worse_days",
+    "unhealthy_days",
+    "api_observation_days",
+    "origin_avg_api",
+    "origin_max_api",
+    "origin_moderate_or_worse_days",
+    "origin_unhealthy_days",
+    "origin_api_observation_days",
+    "api_lag_1",
+    "rolling_avg_api_3m",
+    "rolling_unhealthy_days_3m",
+]
+VALID_VARIANTS = ("core", "full")
+
+
+def variant_paths(variant):
+    processed_dir = PROJECT_ROOT / "data" / "processed" / "demand" / variant
+    artifact_dir = PROJECT_ROOT / "artifacts" / "demand" / variant
+    return (
+        processed_dir / "horizon_training_dataset.csv",
+        processed_dir / "model_splits",
+        artifact_dir / "reports",
+    )
 
 
 # Load and validate the horizon dataset
 
-def load_horizon_data():
-    if not INPUT_FILE.exists():
+def load_horizon_data(variant="core"):
+    input_file, _, _ = variant_paths(variant)
+    if not input_file.exists():
         raise FileNotFoundError(
-            f"Horizon training dataset cannot be found:\n{INPUT_FILE}\n"
+            f"Horizon training dataset cannot be found:\n{input_file}\n"
             "Run the preprocessing pipeline through the horizons stage first."
         )
 
     data = pd.read_csv(
-        INPUT_FILE,
+        input_file,
         parse_dates=["forecast_origin_month", "target_month"],
     )
 
@@ -82,9 +105,10 @@ def load_horizon_data():
     if data[TARGET_COLUMN].isna().any():
         raise ValueError("Training data contains rows without a valid future target.")
 
-    unexpected_removed_columns = [
-        column for column in REMOVED_MODEL_COLUMNS if column in data.columns
-    ]
+    removed_columns = list(ALWAYS_REMOVED_MODEL_COLUMNS)
+    if variant == "core":
+        removed_columns.extend(AIR_QUALITY_COLUMNS)
+    unexpected_removed_columns = [column for column in removed_columns if column in data]
     if unexpected_removed_columns:
         raise ValueError(
             "Removed fields are still present in demand model data: "
@@ -234,16 +258,21 @@ def split_xy(data, feature_columns):
 
 # Save reusable raw splits and split metadata
 
-def save_outputs(train, validation, test, feature_columns, numeric_features, boundaries):
-    SPLIT_DIR.mkdir(parents=True, exist_ok=True)
-    REPORT_DIR.mkdir(parents=True, exist_ok=True)
+def save_outputs(train, validation, test, feature_columns, numeric_features, boundaries, variant="core"):
+    _, split_dir, report_dir = variant_paths(variant)
+    split_dir.mkdir(parents=True, exist_ok=True)
+    report_dir.mkdir(parents=True, exist_ok=True)
 
-    train.to_csv(SPLIT_DIR / "train.csv", index=False)
-    validation.to_csv(SPLIT_DIR / "validation.csv", index=False)
-    test.to_csv(SPLIT_DIR / "test.csv", index=False)
+    train.to_csv(split_dir / "train.csv", index=False)
+    validation.to_csv(split_dir / "validation.csv", index=False)
+    test.to_csv(split_dir / "test.csv", index=False)
 
     metadata = {
         "target_column": TARGET_COLUMN,
+        "model_variant": variant,
+        "requires_air_quality": variant == "full",
+        "requires_fama": False,
+        "stock_used": False,
         "categorical_features": CATEGORICAL_FEATURES,
         "numeric_features": numeric_features,
         "feature_columns": feature_columns,
@@ -257,22 +286,24 @@ def save_outputs(train, validation, test, feature_columns, numeric_features, bou
         },
     }
 
-    metadata_file = REPORT_DIR / "model_data_split.json"
+    metadata_file = report_dir / "model_data_split.json"
     with metadata_file.open("w", encoding="utf-8") as output_file:
         json.dump(metadata, output_file, indent=2)
 
-    print(f"Saved: {SPLIT_DIR / 'train.csv'}")
-    print(f"Saved: {SPLIT_DIR / 'validation.csv'}")
-    print(f"Saved: {SPLIT_DIR / 'test.csv'}")
+    print(f"Saved: {split_dir / 'train.csv'}")
+    print(f"Saved: {split_dir / 'validation.csv'}")
+    print(f"Saved: {split_dir / 'test.csv'}")
     print(f"Saved: {metadata_file}")
 
 
 # Run model-data preparation
 
-def main():
-    print("Preparing model-ready chronological datasets...")
+def main(variant="core"):
+    if variant not in VALID_VARIANTS:
+        raise ValueError(f"Variant must be one of: {', '.join(VALID_VARIANTS)}")
+    print(f"Preparing demand chronological splits ({variant} variant)...")
 
-    data = load_horizon_data()
+    data = load_horizon_data(variant)
     feature_columns, numeric_features = select_model_columns(data)
     train, validation, test, boundaries = create_chronological_split(data)
 
@@ -283,6 +314,7 @@ def main():
         feature_columns,
         numeric_features,
         boundaries,
+        variant,
     )
 
     print(f"Features: {len(feature_columns)}")
@@ -299,4 +331,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--variant", choices=VALID_VARIANTS, default="core")
+    main(parser.parse_args().variant)

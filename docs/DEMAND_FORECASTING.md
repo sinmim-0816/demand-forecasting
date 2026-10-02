@@ -10,7 +10,7 @@ Commands are documented in [RUN_GUIDE.md](RUN_GUIDE.md). Folder placement is doc
 Client transactions
     -> monthly aggregation
     -> weather and solar radiation
-    -> API haze indicators
+    -> optional API haze collection for monitoring
     -> holidays
     -> contextual merge
     -> demand/price lag and rolling features
@@ -26,15 +26,20 @@ Client transactions
 
 `src/preprocessing/prepare_monthly_data.py` reads the configured client workbook and creates one monthly row per crop and location. The start and end dates are inferred from the client data rather than hardcoded.
 
-Main values include demand, weighted procurement price, order count, completed/cancelled order counts, and stock context.
+Main values include demand, weighted procurement price, order count, and completed/cancelled order counts. Raw stock values are retained only for traceability and are not model inputs.
 
 ### Weather and solar radiation
 
 `src/preprocessing/prepare_weather_data.py` prepares monthly temperature, rainfall, and shortwave solar-radiation context. Weather coverage follows the client dataset automatically.
 
-### Air quality
+### Air quality and model variants
 
-`src/preprocessing/prepare_air_quality_data.py` creates monthly Sarawak API features such as average API, maximum API, moderate-or-worse days, unhealthy days, and observation count.
+`src/preprocessing/prepare_air_quality_data.py` creates monthly Sarawak API features. The full demand variant uses them; the core fallback excludes them. Both variants use the same target and chronological split.
+
+| Variant | Air quality | FAMA | Production purpose |
+|---|---:|---:|---|
+| `full` | Yes | Not applicable | Use when AQ history passes readiness checks. |
+| `core` | No | Not applicable | Reliable fallback when AQ is missing or incomplete. |
 
 ### Holidays
 
@@ -46,9 +51,11 @@ Main values include demand, weighted procurement price, order count, completed/c
 
 ### Historical features
 
-`src/demand_forecasting/create_features.py` creates historical demand, price, stock, and rolling features. Lag values stay anchored to the forecast-origin month.
+`src/demand_forecasting/create_features.py` creates historical demand, price, weather, solar, and rolling features. Lag values stay anchored to the forecast-origin month.
 
 `supermarket_order_count` and `trader_order_count` remain available in the shared monthly table for reporting, but are deliberately removed from the demand model contract because CropWise cannot observe a reliable order type.
+
+The unreliable stock family is excluded from both variants. AQ is retained only by `full` and excluded by `core`.
 
 ### H1-H12 transformation
 
@@ -64,9 +71,11 @@ Historical rows without a known future target are excluded from training. Latest
 
 ## Model input rules
 
-- Historical demand, price, stock, weather, solar, and haze features come from the origin month or earlier.
+- Historical demand, price, weather, and solar features come from the origin month or earlier.
 - `future_demand_kg` is the target and never an input feature.
-- Actual target-month price, rainfall, temperature, solar radiation, or API cannot be used.
+- Actual target-month price, rainfall, temperature, or solar radiation cannot be used.
+- Stock fields are not part of either model contract.
+- AQ origin and lag features are allowed only in the `full` contract.
 - Target calendar and holiday values are allowed because they are known in advance.
 - Future weather context uses historical monthly normals, not unknown actual observations.
 
@@ -94,13 +103,11 @@ Metrics:
 
 ```text
 data/processed/shared/monthly_demand_contextual.csv
-data/processed/demand/model_features.csv
-data/processed/demand/horizon_training_dataset.csv
-data/processed/demand/future_horizon_features.csv
-data/processed/demand/model_splits/
-artifacts/demand/models/
-artifacts/demand/predictions/
-artifacts/demand/reports/
+data/processed/demand/<core|full>/model_features.csv
+data/processed/demand/<core|full>/horizon_training_dataset.csv
+data/processed/demand/<core|full>/future_horizon_features.csv
+data/processed/demand/<core|full>/model_splits/
+artifacts/demand/<core|full>/{models,predictions,reports}/
 ```
 
 ## Updating with new client data

@@ -27,7 +27,10 @@ STAGES = [
     ("merge", "Merge contextual data", "merge_contextual_data"),
     ("features", "Create time-series features", "create_features"),
     ("horizons", "Create H1-H12 horizon dataset", "create_horizon_dataset"),
+    ("splits", "Create chronological model splits", "prepare_model_data"),
 ]
+VARIANT_STAGES = {"features", "horizons", "splits"}
+VALID_VARIANTS = ("core", "full", "both")
 
 
 def parse_args():
@@ -37,6 +40,12 @@ def parse_args():
         choices=[stage[0] for stage in STAGES],
         default="monthly",
         help="Resume from this stage (default: monthly).",
+    )
+    parser.add_argument(
+        "--variant",
+        choices=VALID_VARIANTS,
+        default="both",
+        help="Build core, full, or both model datasets (default: both).",
     )
     return parser.parse_args()
 
@@ -70,7 +79,13 @@ def main():
         stage_start = time.perf_counter()
         try:
             stage_module = importlib.import_module(module_name)
-            stage_module.main()
+            if key in VARIANT_STAGES:
+                variants = ("core", "full") if args.variant == "both" else (args.variant,)
+                for variant in variants:
+                    print(f"Building {variant} variant...")
+                    stage_module.main(variant=variant)
+            else:
+                stage_module.main()
         except Exception as error:
             print(f"\nPIPELINE STOPPED AT STAGE '{key}': {error}")
             raise
@@ -80,8 +95,8 @@ def main():
     print("PREPROCESSING PIPELINE COMPLETE")
     print(f"Total time: {time.perf_counter() - pipeline_start:.1f} seconds.")
     print(
-        "Training dataset: "
-        f"{PROJECT_ROOT / 'data' / 'processed' / 'demand' / 'horizon_training_dataset.csv'}"
+        "Variant datasets: "
+        f"{PROJECT_ROOT / 'data' / 'processed' / 'demand' / '<core|full>'}"
     )
     print("=" * 60)
 

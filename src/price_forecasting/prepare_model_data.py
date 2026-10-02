@@ -1,3 +1,4 @@
+import argparse
 import json
 from pathlib import Path
 
@@ -7,17 +8,6 @@ import pandas as pd
 # Project paths
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-INPUT_FILE = (
-    PROJECT_ROOT
-    / "data"
-    / "processed"
-    / "price"
-    / "price_horizon_training_dataset.csv"
-)
-SPLIT_DIR = PROJECT_ROOT / "data" / "processed" / "price" / "model_splits"
-REPORT_DIR = PROJECT_ROOT / "artifacts" / "price" / "reports"
-
-
 # Split settings
 
 VALIDATION_MONTHS = 3
@@ -44,7 +34,7 @@ EXCLUDED_FEATURES = [
     TARGET_COLUMN,
 ]
 
-REMOVED_MODEL_COLUMNS = [
+ALWAYS_REMOVED_MODEL_COLUMNS = [
     "supermarket_order_count",
     "trader_order_count",
     "origin_total_stock_available_kg",
@@ -53,19 +43,44 @@ REMOVED_MODEL_COLUMNS = [
     "stock_available_lag_1",
     "stock_to_demand_ratio_lag_1",
 ]
+AIR_QUALITY_COLUMNS = [
+    "avg_api",
+    "max_api",
+    "moderate_or_worse_days",
+    "unhealthy_days",
+    "api_observation_days",
+    "origin_avg_api",
+    "origin_max_api",
+    "origin_moderate_or_worse_days",
+    "origin_unhealthy_days",
+    "origin_api_observation_days",
+]
+FAMA_FEATURE_PREFIX = "fama_"
+VALID_VARIANTS = ("core", "full")
+
+
+def variant_paths(variant):
+    processed_dir = PROJECT_ROOT / "data" / "processed" / "price" / variant
+    artifact_dir = PROJECT_ROOT / "artifacts" / "price" / variant
+    return (
+        processed_dir / "price_horizon_training_dataset.csv",
+        processed_dir / "model_splits",
+        artifact_dir / "reports",
+    )
 
 
 # Load and validate the price horizon dataset
 
-def load_horizon_data():
-    if not INPUT_FILE.exists():
+def load_horizon_data(variant="core"):
+    input_file, _, _ = variant_paths(variant)
+    if not input_file.exists():
         raise FileNotFoundError(
-            f"Price horizon training dataset cannot be found:\n{INPUT_FILE}\n"
+            f"Price horizon training dataset cannot be found:\n{input_file}\n"
             "Run src/price_forecasting/create_price_horizon_dataset.py first."
         )
 
     data = pd.read_csv(
-        INPUT_FILE,
+        input_file,
         parse_dates=IDENTIFIER_COLUMNS,
     )
 
@@ -90,9 +105,13 @@ def load_horizon_data():
     if data[TARGET_COLUMN].isna().any():
         raise ValueError("Price training data contains rows without a valid target.")
 
-    unexpected_removed_columns = [
-        column for column in REMOVED_MODEL_COLUMNS if column in data.columns
-    ]
+    removed_columns = list(ALWAYS_REMOVED_MODEL_COLUMNS)
+    if variant == "core":
+        removed_columns.extend(AIR_QUALITY_COLUMNS)
+        removed_columns.extend(
+            column for column in data if column.startswith(FAMA_FEATURE_PREFIX)
+        )
+    unexpected_removed_columns = [column for column in removed_columns if column in data]
     if unexpected_removed_columns:
         raise ValueError(
             "Removed fields are still present in price model data: "
@@ -257,13 +276,15 @@ def save_outputs(
     feature_columns,
     numeric_features,
     boundaries,
+    variant="core",
 ):
-    SPLIT_DIR.mkdir(parents=True, exist_ok=True)
-    REPORT_DIR.mkdir(parents=True, exist_ok=True)
+    _, split_dir, report_dir = variant_paths(variant)
+    split_dir.mkdir(parents=True, exist_ok=True)
+    report_dir.mkdir(parents=True, exist_ok=True)
 
-    train_file = SPLIT_DIR / "train.csv"
-    validation_file = SPLIT_DIR / "validation.csv"
-    test_file = SPLIT_DIR / "test.csv"
+    train_file = split_dir / "train.csv"
+    validation_file = split_dir / "validation.csv"
+    test_file = split_dir / "test.csv"
 
     train.to_csv(train_file, index=False)
     validation.to_csv(validation_file, index=False)
@@ -271,6 +292,10 @@ def save_outputs(
 
     metadata = {
         "target_column": TARGET_COLUMN,
+        "model_variant": variant,
+        "requires_air_quality": variant == "full",
+        "requires_fama": variant == "full",
+        "stock_used": False,
         "categorical_features": CATEGORICAL_FEATURES,
         "numeric_features": numeric_features,
         "feature_columns": feature_columns,
@@ -285,7 +310,7 @@ def save_outputs(
         },
     }
 
-    metadata_file = REPORT_DIR / "model_data_split.json"
+    metadata_file = report_dir / "model_data_split.json"
     with metadata_file.open("w", encoding="utf-8") as output_file:
         json.dump(metadata, output_file, indent=2)
 
@@ -297,10 +322,12 @@ def save_outputs(
 
 # Run price model-data preparation
 
-def main():
-    print("Preparing price model-ready chronological datasets...")
+def main(variant="core"):
+    if variant not in VALID_VARIANTS:
+        raise ValueError(f"Variant must be one of: {', '.join(VALID_VARIANTS)}")
+    print(f"Preparing price chronological splits ({variant} variant)...")
 
-    data = load_horizon_data()
+    data = load_horizon_data(variant)
     feature_columns, numeric_features = select_model_columns(data)
     train, validation, test, boundaries = create_chronological_split(data)
 
@@ -311,6 +338,7 @@ def main():
         feature_columns,
         numeric_features,
         boundaries,
+        variant,
     )
 
     print(f"Features: {len(feature_columns)}")
@@ -332,4 +360,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--variant", choices=VALID_VARIANTS, default="core")
+    main(parser.parse_args().variant)

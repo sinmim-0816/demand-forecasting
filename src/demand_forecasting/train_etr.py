@@ -39,8 +39,8 @@ ETR_PARAMS = {
 
 # Load chronological data splits
 
-def load_splits(project_root):
-    split_dir = project_root / "data" / "processed" / "demand" / "model_splits"
+def load_splits(project_root, variant="core"):
+    split_dir = project_root / "data" / "processed" / "demand" / variant / "model_splits"
     split_files = {
         "train": split_dir / "train.csv",
         "validation": split_dir / "validation.csv",
@@ -180,14 +180,16 @@ def save_artifacts(
     test_predictions,
     metrics,
     feature_columns,
+    variant,
     drive_dir=None,
 ):
     import joblib
     import sklearn
 
-    model_dir = project_root / "artifacts" / "demand" / "models"
-    prediction_dir = project_root / "artifacts" / "demand" / "predictions"
-    report_dir = project_root / "artifacts" / "demand" / "reports"
+    artifact_root = project_root / "artifacts" / "demand" / variant
+    model_dir = artifact_root / "models"
+    prediction_dir = artifact_root / "predictions"
+    report_dir = artifact_root / "reports"
 
     for directory in (model_dir, prediction_dir, report_dir):
         directory.mkdir(parents=True, exist_ok=True)
@@ -205,6 +207,12 @@ def save_artifacts(
 
     metadata = {
         "model": "global_direct_multi_horizon_extra_trees",
+        "model_version": f"{variant}_v1",
+        "model_variant": variant,
+        "requires_air_quality": variant == "full",
+        "requires_fama": False,
+        "air_quality_used": variant == "full",
+        "stock_used": False,
         "target": TARGET_COLUMN,
         "feature_columns": feature_columns,
         "categorical_features": CATEGORICAL_FEATURES,
@@ -252,9 +260,9 @@ def save_artifacts(
 
 # Train, validate, refit, and test
 
-def run_training(project_root=DEFAULT_PROJECT_ROOT, drive_dir=None):
+def run_training(project_root=DEFAULT_PROJECT_ROOT, drive_dir=None, variant="core"):
     project_root = Path(project_root).expanduser().resolve()
-    splits = load_splits(project_root)
+    splits = load_splits(project_root, variant)
 
     feature_columns, numeric_features = select_model_columns(splits["train"])
     x_train, y_train = split_xy(splits["train"], feature_columns)
@@ -290,6 +298,7 @@ def run_training(project_root=DEFAULT_PROJECT_ROOT, drive_dir=None):
         test_predictions=test_predictions,
         metrics=metrics,
         feature_columns=feature_columns,
+        variant=variant,
         drive_dir=drive_dir,
     )
 
@@ -316,6 +325,10 @@ def parse_args():
         help="Project root containing data/processed/demand/model_splits.",
     )
     parser.add_argument(
+        "--variant", choices=["core", "full"], default="core",
+        help="Model variant to train (default: core).",
+    )
+    parser.add_argument(
         "--drive-dir",
         type=Path,
         default=None,
@@ -329,6 +342,7 @@ def main():
     results = run_training(
         project_root=args.project_root,
         drive_dir=args.drive_dir,
+        variant=args.variant,
     )
 
     print("\nEXTRA TREES TRAINING COMPLETE")

@@ -21,6 +21,8 @@ STAGES = [
     ),
     ("splits", "Create chronological price model splits", "prepare_model_data"),
 ]
+VARIANT_STAGES = {"features", "horizons", "splits"}
+VALID_VARIANTS = ("core", "full", "both")
 
 
 def parse_args():
@@ -30,6 +32,12 @@ def parse_args():
         choices=[stage[0] for stage in STAGES],
         default="fama",
         help="Resume from this stage (default: fama).",
+    )
+    parser.add_argument(
+        "--variant",
+        choices=VALID_VARIANTS,
+        default="both",
+        help="Build core, full, or both price datasets (default: both).",
     )
     return parser.parse_args()
 
@@ -49,7 +57,15 @@ def main():
         stage_start = time.perf_counter()
         try:
             stage_module = importlib.import_module(module_name)
-            stage_module.main()
+            if key in VARIANT_STAGES:
+                variants = ("core", "full") if args.variant == "both" else (args.variant,)
+                for variant in variants:
+                    print(f"Building {variant} variant...")
+                    stage_module.main(variant=variant)
+            elif key == "fama" and args.variant == "core":
+                print("Skipped: the core price variant does not use FAMA.")
+            else:
+                stage_module.main()
         except Exception as error:
             print(f"\nPIPELINE STOPPED AT STAGE '{key}': {error}")
             raise
@@ -58,8 +74,8 @@ def main():
     print("\nPRICE PREPROCESSING PIPELINE COMPLETE")
     print(f"Total time: {time.perf_counter() - pipeline_start:.1f} seconds.")
     print(
-        "Training dataset: "
-        f"{PROJECT_ROOT / 'data' / 'processed' / 'price' / 'price_horizon_training_dataset.csv'}"
+        "Variant datasets: "
+        f"{PROJECT_ROOT / 'data' / 'processed' / 'price' / '<core|full>'}"
     )
 
 

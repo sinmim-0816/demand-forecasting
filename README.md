@@ -56,10 +56,10 @@ For training notebooks, tuning commands, prediction commands, and resume options
 ## Main outputs
 
 ```text
-data/processed/demand/              Demand features, horizons, future rows, splits
-data/processed/price/               Price features, horizons, future rows, splits
-artifacts/demand/                   Demand models, predictions, reports
-artifacts/price/                    Price models, predictions, reports
+data/processed/demand/{core,full}/  Demand features, horizons, future rows, splits
+data/processed/price/{core,full}/   Price features, horizons, future rows, splits
+artifacts/demand/{core,full}/       Demand models, predictions, reports
+artifacts/price/{core,full}/        Price models, predictions, reports
 artifacts/recommendation/           Ranked crop recommendations
 ```
 

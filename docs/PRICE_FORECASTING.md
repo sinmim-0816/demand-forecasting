@@ -33,6 +33,15 @@ The mapping file controls which FAMA series may enter the model. Only confirmed 
 
 Current confirmed mappings are Bittergourd, Cucumber, Eggplant, Kangkung, Longbean, Okra, Pumpkin, and Spinach.
 
+## Full and core variants
+
+| Variant | Air quality | FAMA | Production purpose |
+|---|---:|---:|---|
+| `full` | Yes | Yes | Use per crop when AQ is ready and a verified FAMA series has sufficient lags. |
+| `core` | No | No | Fallback for missing AQ, unmapped crops, or incomplete FAMA history. |
+
+The selector must operate per crop. A crop without a confirmed FAMA mapping cannot use the full price model even if another crop has FAMA data.
+
 ## Historical price features
 
 `src/price_forecasting/create_price_features.py` creates:
@@ -41,7 +50,7 @@ Current confirmed mappings are Bittergourd, Cucumber, Eggplant, Kangkung, Longbe
 - Rolling price means for 3 and 6 months
 - One-month absolute and percentage price change
 - Demand lags and rolling demand
-- Lagged order count, stock, and stock-to-demand ratio
+- Lagged order count
 - FAMA Ladang price lags 1, 3, 6, and 12
 - FAMA rolling means and price changes
 - FAMA mapping and availability indicators
@@ -49,6 +58,8 @@ Current confirmed mappings are Bittergourd, Cucumber, Eggplant, Kangkung, Longbe
 FAMA is contextual data. The current-month FAMA value is not exposed to the model; the minimum FAMA lag is one month.
 
 `supermarket_order_count` and `trader_order_count` remain available in the shared monthly table for reporting, but are deliberately removed from the price model contract because CropWise cannot observe a reliable order type.
+
+The unreliable stock family is excluded from both variants. Core excludes AQ and every FAMA field. Full retains origin AQ and leakage-safe lagged FAMA fields.
 
 The first 12 months of each crop/location series are removed because `price_lag_12` does not yet exist.
 
@@ -62,7 +73,7 @@ Target:
 future_weighted_avg_procurement_price_rm_per_kg
 ```
 
-Origin price, demand, stock, FAMA, and contextual history remain anchored to the forecast origin. Target calendar and holiday fields and historical target-month weather normals may be added because they do not reveal the actual future price.
+Origin price, demand, FAMA, weather, solar, and calendar history remain anchored to the forecast origin. Target calendar and holiday fields and historical target-month weather normals may be added because they do not reveal the actual future price.
 
 ## Chronological evaluation
 
@@ -87,21 +98,19 @@ The stacking model is not automatically better. It should be selected only when 
 The preprocessing pipeline creates:
 
 ```text
-data/processed/price/future_price_horizon_features.csv
+data/processed/price/<core|full>/future_price_horizon_features.csv
 ```
 
-Run `notebooks/price_forecasting/predict_xgboost.ipynb` locally with the exact scikit-learn and XGBoost versions used for training. The resulting future price forecast is also an input to crop recommendation.
+Run `python src/price_forecasting/predict_future_xgboost.py --variant auto` locally with the exact scikit-learn and XGBoost versions used for training. It routes each crop row to full or core and records `model_variant` in the output. The resulting future price forecast is also an input to crop recommendation.
 
 ## Important outputs
 
 ```text
-data/processed/price/price_features.csv
-data/processed/price/price_horizon_training_dataset.csv
-data/processed/price/future_price_horizon_features.csv
-data/processed/price/model_splits/
-artifacts/price/models/
-artifacts/price/predictions/
-artifacts/price/reports/
+data/processed/price/<core|full>/price_features.csv
+data/processed/price/<core|full>/price_horizon_training_dataset.csv
+data/processed/price/<core|full>/future_price_horizon_features.csv
+data/processed/price/<core|full>/model_splits/
+artifacts/price/<core|full>/{models,predictions,reports}/
 ```
 
 Whenever FAMA mappings, feature engineering, or historical data change, rerun preprocessing and retrain all price models before comparing them again.
