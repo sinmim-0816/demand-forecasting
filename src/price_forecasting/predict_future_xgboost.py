@@ -26,20 +26,72 @@ KEY_COLUMNS = [
     "location",
 ]
 TARGET_COLUMN = "future_weighted_avg_procurement_price_rm_per_kg"
+PREDICTION_COLUMN = "predicted_procurement_price_rm_per_kg"
 
 
 def variant_paths(variant):
     artifact_root = PROJECT_ROOT / "artifacts" / "price" / variant
     return {
         "model": artifact_root / "models" / "global_xgboost_pipeline.joblib",
+        "native_model": artifact_root / "models" / "global_xgboost_model.json",
         "metadata": artifact_root / "reports" / "xgboost_training_metadata.json",
         "features": PROJECT_ROOT / "data" / "processed" / "price" / variant / "future_price_horizon_features.csv",
+        "training": PROJECT_ROOT / "data" / "processed" / "price" / variant / "price_horizon_training_dataset.csv",
     }
+
+
+def rebuild_pipeline_from_native(variant, paths, metadata):
+    """Recover across incompatible joblib/XGBoost versions using portable JSON."""
+
+    from sklearn.compose import ColumnTransformer
+    from sklearn.impute import SimpleImputer
+    from sklearn.pipeline import Pipeline
+    from sklearn.preprocessing import OneHotEncoder
+    from xgboost import XGBRegressor
+
+    for key in ("native_model", "training"):
+        if not paths[key].exists():
+            raise FileNotFoundError(
+                f"Cannot rebuild {variant} pipeline; required file is missing: {paths[key]}"
+            )
+
+    training = pd.read_csv(paths["training"], parse_dates=["target_month"])
+    training_end = pd.Timestamp(metadata["training_data_end"])
+    fit_data = training[training["target_month"] <= training_end].copy()
+    feature_columns = metadata["feature_columns"]
+    categorical_features = metadata["categorical_features"]
+    numeric_features = [
+        column for column in feature_columns if column not in categorical_features
+    ]
+    if fit_data.empty:
+        raise ValueError("No rows are available to reconstruct the saved preprocessor.")
+
+    categorical_pipeline = Pipeline(
+        [
+            ("imputer", SimpleImputer(strategy="most_frequent")),
+            ("one_hot", OneHotEncoder(handle_unknown="ignore", sparse_output=False)),
+        ]
+    )
+    numeric_pipeline = Pipeline([("imputer", SimpleImputer(strategy="median"))])
+    preprocessor = ColumnTransformer(
+        [
+            ("categorical", categorical_pipeline, categorical_features),
+            ("numeric", numeric_pipeline, numeric_features),
+        ],
+        remainder="drop",
+        verbose_feature_names_out=False,
+    )
+    preprocessor.fit(fit_data[feature_columns])
+
+    model = XGBRegressor()
+    model.load_model(paths["native_model"])
+    return Pipeline([("preprocessor", preprocessor), ("model", model)])
 
 
 def load_variant(variant):
     paths = variant_paths(variant)
-    for path in paths.values():
+    for key in ("model", "metadata", "features"):
+        path = paths[key]
         if not path.exists():
             raise FileNotFoundError(f"Required {variant} price file not found: {path}")
     metadata = json.loads(paths["metadata"].read_text(encoding="utf-8"))
@@ -52,10 +104,18 @@ def load_variant(variant):
         raise ValueError(f"{variant} future features are missing: {missing}")
     try:
         pipeline = joblib.load(paths["model"])
-    except (AttributeError, ModuleNotFoundError, ValueError) as error:
-        raise RuntimeError(
-            f"Could not load the {variant} price pipeline. Use its recorded package versions."
-        ) from error
+    except Exception as error:
+        print(
+            f"WARNING: Could not deserialize the {variant} joblib pipeline "
+            f"({type(error).__name__}). Rebuilding it from the native XGBoost model."
+        )
+        try:
+            pipeline = rebuild_pipeline_from_native(variant, paths, metadata)
+        except Exception as rebuild_error:
+            raise RuntimeError(
+                f"Could not load or reconstruct the {variant} price pipeline. "
+                "Use the training package versions or retrain locally."
+            ) from rebuild_error
     return pipeline, metadata, features
 
 
@@ -74,7 +134,7 @@ def predict_auto():
     variants = select_price_variants(full, core_metadata, full_metadata)
     output = full[KEY_COLUMNS].copy()
     output["model_variant"] = variants
-    output["predicted_price_rm_per_kg"] = np.nan
+    output[PREDICTION_COLUMN] = np.nan
 
     for variant, pipeline, metadata, features in (
         ("core", core_pipeline, core_metadata, core),
@@ -83,7 +143,7 @@ def predict_auto():
         mask = variants.eq(variant)
         if mask.any():
             values = pipeline.predict(features.loc[mask, metadata["feature_columns"]])
-            output.loc[mask, "predicted_price_rm_per_kg"] = np.maximum(values, 0.0)
+            output.loc[mask, PREDICTION_COLUMN] = np.maximum(values, 0.0)
 
     output["forecast_source"] = "xgboost_price_auto_full_core"
     return output
@@ -93,7 +153,7 @@ def predict_one(variant):
     pipeline, metadata, features = load_variant(variant)
     output = features[KEY_COLUMNS].copy()
     values = pipeline.predict(features[metadata["feature_columns"]])
-    output["predicted_price_rm_per_kg"] = np.maximum(values, 0.0)
+    output[PREDICTION_COLUMN] = np.maximum(values, 0.0)
     output["model_variant"] = variant
     output["forecast_source"] = f"xgboost_price_{variant}"
     return output
@@ -101,9 +161,7 @@ def predict_one(variant):
 
 def main(variant="auto"):
     output = predict_auto() if variant == "auto" else predict_one(variant)
-    output["predicted_price_rm_per_kg"] = output[
-        "predicted_price_rm_per_kg"
-    ].round(4)
+    output[PREDICTION_COLUMN] = output[PREDICTION_COLUMN].round(4)
     output = output.sort_values(["target_month", "crop", "location"]).reset_index(drop=True)
     output_file = (
         PROJECT_ROOT

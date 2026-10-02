@@ -173,8 +173,14 @@ def create_candidates(farmer, supported_crops):
                 "demand_forecast_source": demand_row.get(
                     "forecast_source", "unspecified"
                 ),
+                "demand_model_variant": demand_row.get(
+                    "model_variant", "unspecified"
+                ),
                 "price_forecast_source": price_row.get(
                     "forecast_source", "xgboost_price"
+                ),
+                "price_model_variant": price_row.get(
+                    "model_variant", "unspecified"
                 ),
                 "forecast_confidence": "not_assessed",
             }

@@ -1,10 +1,8 @@
 {
-  "model": "global_direct_multi_horizon_xgboost",
-  "model_version": "core_v1",
+  "model": "global_direct_multi_horizon_demand_xgboost",
   "model_variant": "core",
   "requires_air_quality": false,
   "requires_fama": false,
-  "air_quality_used": false,
   "stock_used": false,
   "target": "future_demand_kg",
   "feature_columns": [
@@ -65,30 +63,22 @@
     "origin_season",
     "target_season"
   ],
-  "xgboost_parameters": {
-    "objective": "reg:squarederror",
-    "n_estimators": 500,
-    "learning_rate": 0.03,
-    "max_depth": 6,
-    "min_child_weight": 3,
-    "subsample": 0.85,
-    "colsample_bytree": 0.85,
-    "reg_alpha": 0.05,
-    "reg_lambda": 1.0,
-    "tree_method": "hist",
-    "eval_metric": "mae",
-    "random_state": 42,
-    "n_jobs": -1,
-    "device": "cpu"
+  "training_data_end": "2025-09-01",
+  "test_metrics": {
+    "model": "xgboost",
+    "model_variant": "core",
+    "split": "test",
+    "forecast_horizon": "overall",
+    "rows": 1620,
+    "mae": 533.2430982424889,
+    "rmse": 670.9385840099349,
+    "wape": 0.204922438712801,
+    "r2": 0.536092082995365
   },
-  "final_fit_data": "train + validation",
-  "validation_prediction_model": "train only",
-  "test_prediction_model": "train + validation",
   "versions": {
-    "python": "3.12.14",
+    "python": "3.13.15",
     "pandas": "2.2.3",
     "scikit_learn": "1.6.1",
-    "xgboost": "3.4.1",
     "joblib": "1.6.0"
   }
 }
