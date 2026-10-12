@@ -17,3 +17,5 @@ artifacts/price/predictions/*
 !artifacts/price/predictions/.gitkeep
 artifacts/price/reports/*
 !artifacts/price/reports/.gitkeep
+# Large serialized model pipelines
+artifacts/**/models/*.joblib
