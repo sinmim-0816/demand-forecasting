@@ -1,0 +1,17 @@
+{
+  "model": "experimental_ridge_stacker",
+  "model_variant": "full",
+  "requires_air_quality": true,
+  "requires_fama": true,
+  "status": "experimental",
+  "meta_features": [
+    "xgboost_prediction",
+    "etr_prediction"
+  ],
+  "ridge_intercept": 0.10376988897742923,
+  "ridge_coefficients": {
+    "xgboost_prediction": 0.6077999758470448,
+    "etr_prediction": 0.367493202460202
+  },
+  "python": "3.13.16"
+}
