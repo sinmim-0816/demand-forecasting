@@ -53,6 +53,38 @@ python src\crop_recommendation\recommend_crops.py
 
 For training notebooks, tuning commands, prediction commands, and resume options, use [docs/RUN_GUIDE.md](docs/RUN_GUIDE.md).
 
+## Evaluation status and prediction intervals
+
+The demand and price models currently produce point forecasts. They use a
+chronological train/validation/test design rather than a random split:
+
+```text
+Training data             -> fit candidate models
+Validation/rolling folds  -> compare models and select settings
+Training + validation     -> fit the final model
+Held-out test data        -> evaluate final point-forecast performance
+```
+
+This establishes held-out performance for metrics such as MAE, RMSE, WAPE,
+and R-squared. It does not establish prediction intervals. The current API and
+forecast files therefore must not describe their outputs as 80% or 95%
+uncertainty ranges.
+
+Prediction intervals are planned future work. A valid implementation must:
+
+1. Reserve calibration observations that were not used to fit or tune the
+   corresponding model, or use a carefully designed rolling-origin
+   calibration procedure after the model settings are fixed.
+2. Calculate lower and upper bounds, preferably separately for H1-H12 when
+   enough calibration observations are available.
+3. Evaluate the bounds on unseen chronological test data.
+4. Report empirical coverage and average interval width before exposing the
+   intervals through the API or frontend.
+
+For example, a nominal 80% interval should contain approximately 80% of the
+unseen test targets. The held-out test set must not be used both to choose the
+interval width and to report its final coverage.
+
 ## Main outputs
 
 ```text

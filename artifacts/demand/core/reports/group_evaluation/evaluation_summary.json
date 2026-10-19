@@ -1,0 +1,68 @@
+{
+  "domain": "demand",
+  "variant": "core",
+  "model": "tuned_xgboost",
+  "target_column": "future_demand_kg",
+  "prediction_column": "xgboost_tuned_prediction",
+  "unit": "kg",
+  "signed_error_definition": "actual - predicted",
+  "positive_bias_means": "underprediction",
+  "weak_group_rule": "rows >= minimum and WAPE >= dimension 75th percentile and WAPE > overall",
+  "consistent_crop_rule": "crop overall WAPE > model overall WAPE and crop is worse than overall in at least two target months and at least two-thirds of evaluated months",
+  "minimum_group_rows": 12,
+  "overall_metrics": {
+    "rows": 1620,
+    "mean_actual": 2602.17037037037,
+    "mean_prediction": 2518.669023351852,
+    "mae": 500.1818040925926,
+    "rmse": 625.7977065477054,
+    "wape": 0.19221716217658763,
+    "mean_signed_error": 83.50134701851852,
+    "median_signed_error": 73.10585000000015,
+    "normalized_bias": 0.03208911605839,
+    "r2": 0.596415774543528
+  },
+  "coverage": {
+    "target_months": [
+      "2025-10",
+      "2025-11",
+      "2025-12"
+    ],
+    "target_seasons": [
+      "inter_monsoon",
+      "northeast_monsoon"
+    ],
+    "forecast_horizons": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12
+    ],
+    "crops": 15,
+    "locations": 3
+  },
+  "weak_group_count": 18,
+  "consistently_weak_crops": [
+    "Bittergourd",
+    "Lettuce",
+    "Longbean",
+    "Pumpkin",
+    "Okra",
+    "Eggplant"
+  ],
+  "limitations": [
+    "The held-out test set covers 3 target months (2025-10 to 2025-12), not a complete annual cycle. Month and season findings are diagnostic rather than conclusive.",
+    "The represented target seasons are: inter_monsoon, northeast_monsoon. Unrepresented seasons cannot be evaluated from this test set.",
+    "Groups with fewer than 12 test rows are reported but are not flagged as weak because their estimates are less stable.",
+    "Group error differences identify where a model is weaker; they do not establish that crop identity, season, or horizon caused the error.",
+    "This is an offline held-out evaluation. Production bias and drift require stored forecasts to be matched with actual outcomes after target months close."
+  ]
+}

@@ -212,3 +212,35 @@ artifacts/<demand|price>/<core|full>/reports/
 ```
 
 Do not copy a core pipeline into a full directory or rename one variant as the other. The metadata feature list and readiness flags must match the saved pipeline.
+
+## Group error and bias evaluation
+
+Evaluate the selected core demand and price models across crops, target months,
+target seasons, locations, and direct forecast horizons:
+
+```powershell
+python src\evaluation\evaluate_forecast_bias.py --domain both --variant core
+```
+
+Run the same diagnostic for the optional full-context models:
+
+```powershell
+python src\evaluation\evaluate_forecast_bias.py --domain both --variant full
+```
+
+Reports are saved under:
+
+```text
+artifacts/<demand|price>/<core|full>/reports/group_evaluation/
+```
+
+The evaluator defines signed error as `actual - predicted`. Positive normalized
+bias indicates underprediction and negative normalized bias indicates
+overprediction. A group is flagged as weak only when it has at least 12 test
+rows, its WAPE is at or above the dimension's 75th percentile, and its WAPE is
+higher than the model's overall WAPE.
+
+The current held-out test period covers October through December 2025 only.
+Month and season findings are therefore diagnostic and must not be presented as
+complete annual evidence. Production bias monitoring requires saved forecasts
+to be joined with actual outcomes after their target months close.
