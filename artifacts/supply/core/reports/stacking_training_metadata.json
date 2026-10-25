@@ -1,0 +1,39 @@
+{
+  "model": "experimental_supply_ridge_stacker",
+  "model_variant": "core",
+  "status": "experimental",
+  "requires_air_quality": false,
+  "synthetic_training_target": true,
+  "target": "future_production_kg",
+  "base_models": [
+    "global_xgboost_pipeline.joblib",
+    "global_etr_pipeline.joblib"
+  ],
+  "meta_features": [
+    "xgboost_prediction",
+    "etr_prediction"
+  ],
+  "ridge_alpha": 1.0,
+  "ridge_intercept": -59.88062746241576,
+  "ridge_coefficients": {
+    "xgboost_prediction": 0.7472731804114305,
+    "etr_prediction": 0.3564518208448415
+  },
+  "test_metrics": {
+    "model": "stacking_ensemble",
+    "model_variant": "core",
+    "split": "test",
+    "forecast_horizon": "overall",
+    "rows": 1620,
+    "mae": 457.67784044746594,
+    "rmse": 591.0711955991095,
+    "wape": 0.17408622378742164,
+    "r2": 0.651573039090559
+  },
+  "versions": {
+    "python": "3.13.16",
+    "pandas": "2.2.3",
+    "scikit_learn": "1.6.1",
+    "joblib": "1.6.0"
+  }
+}
