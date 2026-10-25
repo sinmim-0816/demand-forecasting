@@ -105,3 +105,31 @@ def get_fama_price_settings():
 
     return input_file, market_level
 
+
+def get_supply_settings():
+    config = load_config()
+    try:
+        supply = config["supply_data"]
+        input_file = Path(supply["file"])
+        settings = {
+            "sheet": supply.get("sheet"),
+            "date_column": supply["date_column"],
+            "crop_column": supply["crop_column"],
+            "location_column": supply["location_column"],
+            "production_column": supply["production_column"],
+        }
+    except KeyError as error:
+        raise ValueError(f"Missing supply-data configuration setting: {error}") from error
+
+    if not input_file.is_absolute():
+        input_file = PROJECT_ROOT / input_file
+    required = [
+        settings["date_column"],
+        settings["crop_column"],
+        settings["location_column"],
+        settings["production_column"],
+    ]
+    if any(not value for value in required):
+        raise ValueError("Supply-data column settings cannot be empty.")
+    return input_file, settings
+

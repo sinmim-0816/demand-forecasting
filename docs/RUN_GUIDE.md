@@ -13,6 +13,26 @@ python -m pip install -r requirements.txt
 
 Update `pipeline_config.json` when the client workbook path, worksheet, date column, air-quality workbook, or FAMA workbook changes.
 
+## Supply preprocessing workflow
+
+Supply preprocessing is ready, but it requires a real or synthetic production-history file that follows [SUPPLY_FORECASTING.md](SUPPLY_FORECASTING.md). After adding the file, run:
+
+```powershell
+python scripts\run_supply_preprocessing_pipeline.py
+```
+
+Build one variant or resume from a completed stage:
+
+```powershell
+python scripts\run_supply_preprocessing_pipeline.py --variant core
+python scripts\run_supply_preprocessing_pipeline.py --variant full
+python scripts\run_supply_preprocessing_pipeline.py --start-at features --variant both
+python scripts\run_supply_preprocessing_pipeline.py --start-at horizons --variant both
+python scripts\run_supply_preprocessing_pipeline.py --start-at splits --variant both
+```
+
+This workflow prepares monthly production features, direct H1-H12 datasets, future feature templates, and chronological splits. It does not train a supply model yet.
+
 ## Demand workflow
 
 ### 1. Run complete demand preprocessing

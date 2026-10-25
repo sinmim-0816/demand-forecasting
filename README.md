@@ -4,7 +4,8 @@ This repository contains three connected but separate components:
 
 1. H1-H12 crop demand forecasting
 2. H1-H12 procurement-price forecasting
-3. Rule-based crop market-opportunity recommendation
+3. Supply-forecasting preprocessing for future H1-H12 production modeling
+4. Rule-based crop market-opportunity recommendation
 
 The detailed documentation is separated by responsibility so that model instructions, architecture, and commands do not become mixed together.
 
@@ -16,6 +17,7 @@ The detailed documentation is separated by responsibility so that model instruct
 | [Run guide](docs/RUN_GUIDE.md) | Authoritative preprocessing, training, prediction, and recommendation commands. |
 | [Demand forecasting](docs/DEMAND_FORECASTING.md) | Demand stages, features, leakage rules, models, evaluation, and outputs. |
 | [Price forecasting](docs/PRICE_FORECASTING.md) | FAMA preprocessing, price features, horizons, models, and outputs. |
+| [Supply forecasting](docs/SUPPLY_FORECASTING.md) | Production-data contract, contextual features, horizons, splits, and commands. |
 | [Crop recommendation](docs/CROP_RECOMMENDATION.md) | Inputs, validation, land calculation, scoring, limitations, and API migration. |
 
 ## Quick setup
@@ -43,6 +45,12 @@ Price preprocessing:
 
 ```powershell
 python scripts\run_price_preprocessing_pipeline.py
+```
+
+Supply preprocessing, after a production-history file is available:
+
+```powershell
+python scripts\run_supply_preprocessing_pipeline.py
 ```
 
 Crop recommendation after future demand and price predictions exist:
@@ -90,8 +98,10 @@ interval width and to report its final coverage.
 ```text
 data/processed/demand/{core,full}/  Demand features, horizons, future rows, splits
 data/processed/price/{core,full}/   Price features, horizons, future rows, splits
+data/processed/supply/{core,full}/  Supply features, horizons, future rows, splits
 artifacts/demand/{core,full}/       Demand models, predictions, reports
 artifacts/price/{core,full}/        Price models, predictions, reports
+artifacts/supply/{core,full}/        Supply split metadata and future model artifacts
 artifacts/recommendation/           Ranked crop recommendations
 ```
 

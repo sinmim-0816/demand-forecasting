@@ -11,8 +11,8 @@ Shared raw procurement and contextual data
        Shared monthly contextual table
               /                 \
              v                   v
-   Demand forecasting      Price forecasting
-   H1-H12 demand rows      H1-H12 price rows
+   Demand forecasting      Price forecasting      Supply preprocessing
+   H1-H12 demand rows      H1-H12 price rows      H1-H12 production rows
              \                   /
               v                 v
           Saved model predictions
@@ -45,15 +45,18 @@ demand-forecasting/
 │   ├── processed/
 │   │   ├── shared/
 │   │   ├── demand/{core,full}/
-│   │   └── price/{core,full}/
+│   │   ├── price/{core,full}/
+│   │   └── supply/{shared,core,full}/
 │   └── recommendation/
 ├── scripts/
 │   ├── run_preprocessing_pipeline.py
-│   └── run_price_preprocessing_pipeline.py
+│   ├── run_price_preprocessing_pipeline.py
+│   └── run_supply_preprocessing_pipeline.py
 ├── src/
 │   ├── preprocessing/
 │   ├── demand_forecasting/
 │   ├── price_forecasting/
+│   ├── supply_forecasting/
 │   ├── crop_recommendation/
 │   ├── evaluation/
 │   ├── prediction/
@@ -78,10 +81,12 @@ demand-forecasting/
 | `data/processed/shared` | Reusable monthly demand, price, weather, solar, haze, and holiday context. |
 | `data/processed/demand/{core,full}` | Separate demand feature contracts, horizon rows, future rows, and splits. |
 | `data/processed/price/{core,full}` | Separate price feature contracts, horizon rows, future rows, and splits. |
+| `data/processed/supply/{shared,core,full}` | Monthly production, supply feature contracts, horizon rows, future rows, and splits. |
 | `data/recommendation` | Temporary JSON/CSV inputs used before API and database integration. |
 | `src/preprocessing` | Shared cleaning and contextual-data preparation. |
 | `src/demand_forecasting` | Demand-specific feature engineering, splitting, tuning, and prediction. |
 | `src/price_forecasting` | FAMA processing and price-specific feature engineering and splitting. |
+| `src/supply_forecasting` | Production aggregation, contextual features, horizons, and chronological splitting. |
 | `src/crop_recommendation` | Validation, land calculation, normalization, scoring, and ranking. |
 | `notebooks` | Colab/Jupyter training and prediction workflows. |
 | `artifacts/demand` | Demand models, predictions, and reports. |

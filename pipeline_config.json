@@ -12,5 +12,13 @@
   "fama_price_data": {
     "file": "data/raw/external/market_prices/DATA HARGA KOMODITI PILIHAN (FAM SIN MIM).xls",
     "market_level": "LADANG"
+  },
+  "supply_data": {
+    "file": "data/raw/supply/supply_history.xlsx",
+    "sheet": "Supply Data",
+    "date_column": "Month",
+    "crop_column": "Crop",
+    "location_column": "Location",
+    "production_column": "Production (kg)"
   }
 }
