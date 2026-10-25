@@ -1,6 +1,6 @@
 # Supply Forecasting Preprocessing
 
-This pipeline prepares data for direct H1-H12 monthly crop-production forecasting. It does not generate synthetic production values and it does not train a model yet.
+This pipeline prepares data for direct H1-H12 monthly crop-production forecasting. Model training is performed separately in the supply forecasting notebooks.
 
 ## Raw data contract
 
@@ -66,6 +66,8 @@ python scripts\run_supply_preprocessing_pipeline.py --start-at splits --variant 
 
 Until the configured supply file exists, the first command intentionally stops with a message describing the required input. This protects the pipeline from silently inventing production values.
 
+The current `supply_history.xlsx` workbook is explicitly marked as synthetic and is intended for pipeline and prototype-model testing only. Replace it with verified local production records before interpreting model scores as real forecasting performance.
+
 ## Outputs
 
 ```text
@@ -81,6 +83,22 @@ artifacts/supply/{core,full}/reports/model_data_split.json
 
 The feature stage needs at least 12 consecutive prior months for every crop-location series. In practice, several years are preferable because the direct H1-H12 transformation and chronological validation/test windows also consume historical coverage.
 
-## Current boundary
+## Model training notebooks
 
-This implementation completes preprocessing only. Model training, tuning, evaluation, inference, and CropWise integration should begin after the production dataset has been reviewed for units, coverage, missing months, and crop/location definitions.
+Upload the Core and Full `supply_horizon_training_dataset.csv` files to Google Drive, then run these Colab notebooks in order:
+
+```text
+notebooks/supply_forecasting/train_xgboost.ipynb
+notebooks/supply_forecasting/train_etr.ipynb
+notebooks/supply_forecasting/train_stacking_ensemble.ipynb
+```
+
+XGBoost and ETR use identical chronological splits. The stacking notebook must run last because it consumes the saved validation and test predictions from both base models. It fits the Ridge meta-model on validation predictions and evaluates it on the untouched test period.
+
+The notebooks save complete model pipelines, predictions, metrics, metadata, and comparison figures under:
+
+```text
+MyDrive/demand-forecasting/artifacts/supply/
+```
+
+Model tuning, future-supply inference, and CropWise integration should begin only after comparing these prototype results. Any production selection must be repeated with verified local production data.
