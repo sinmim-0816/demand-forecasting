@@ -5,6 +5,8 @@ __pycache__/
 .ipynb_checkpoints/
 
 # Generated model artifacts
+artifacts/**
+!artifacts/**/.gitkeep
 artifacts/demand/models/*
 !artifacts/demand/models/.gitkeep
 artifacts/demand/predictions/*
@@ -19,6 +21,12 @@ artifacts/price/reports/*
 !artifacts/price/reports/.gitkeep
 # Large serialized model pipelines
 artifacts/**/models/*.joblib
+
+# Large generated training datasets and chronological splits
+data/processed/**/horizon_training_dataset.csv
+data/processed/**/horizon_training_dataset.parquet
+data/processed/**/horizon_training_dataset.xlsx
+data/processed/**/model_splits/*.csv
 
 
 # Generated processed datasets
