@@ -23,6 +23,8 @@ artifacts/price/reports/*
 artifacts/**/models/*.joblib
 
 # Large generated training datasets and chronological splits
+data/processed/**
+!data/processed/**/.gitkeep
 data/processed/**/horizon_training_dataset.csv
 data/processed/**/horizon_training_dataset.parquet
 data/processed/**/horizon_training_dataset.xlsx
