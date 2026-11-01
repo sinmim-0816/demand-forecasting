@@ -339,7 +339,11 @@ def save_outputs(training, prediction_template, variant):
     paths = variant_paths(variant)
     paths["training_csv"].parent.mkdir(parents=True, exist_ok=True)
     training.to_csv(paths["training_csv"], index=False)
-    training.to_excel(paths["training_excel"], index=False)
+    if len(training) <= 100_000:
+        training.to_excel(paths["training_excel"], index=False)
+    elif paths["training_excel"].exists():
+        paths["training_excel"].unlink()
+        print("Skipped Excel export because the horizon table exceeds 100,000 rows.")
     prediction_template.to_csv(paths["prediction_template"], index=False)
 
     parquet_saved = True
@@ -352,7 +356,8 @@ def save_outputs(training, prediction_template, variant):
     print(f"Training rows: {len(training):,}")
     print(f"Future prediction-template rows: {len(prediction_template):,}")
     print(f"Saved: {paths['training_csv']}")
-    print(f"Saved: {paths['training_excel']}")
+    if paths["training_excel"].exists():
+        print(f"Saved: {paths['training_excel']}")
     print(f"Saved: {paths['prediction_template']}")
     if parquet_saved:
         print(f"Saved: {paths['training_parquet']}")

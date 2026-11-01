@@ -2,6 +2,8 @@
 
 The price workflow predicts future weighted average procurement price in RM/kg. This represents the marketplace/farm procurement price, not retail consumer price.
 
+The current synthetic preprocessing experiment uses the same 98 active system crop names and January 2016–December 2025 coverage as demand and supply. The generated procurement quantities and prices are for pipeline and prototype testing only.
+
 Commands are documented in [RUN_GUIDE.md](RUN_GUIDE.md). Folder placement is documented in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Pipeline

@@ -10,7 +10,8 @@ import pandas as pd
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SUPPLY_DIR = PROJECT_ROOT / "data" / "processed" / "supply"
 MONTHLY_SUPPLY_FILE = SUPPLY_DIR / "shared" / "monthly_supply.csv"
-CONTEXTUAL_FILE = PROJECT_ROOT / "data" / "raw" / "contextual" / "Contextual_Data.xlsx"
+DEFAULT_CONTEXTUAL_FILE = PROJECT_ROOT / "data" / "raw" / "contextual" / "Contextual_Data.xlsx"
+SUPPLY_CONTEXTUAL_FILE = PROJECT_ROOT / "data" / "raw" / "supply" / "Contextual_Data_10Years_Synthetic.xlsx"
 
 GROUP_COLUMNS = ["crop", "location"]
 PRODUCTION_LAGS = [1, 3, 6, 12]
@@ -67,16 +68,17 @@ def load_inputs(variant):
             f"Monthly supply data cannot be found:\n{MONTHLY_SUPPLY_FILE}\n"
             "Run prepare_supply_data.py first."
         )
-    if not CONTEXTUAL_FILE.exists():
-        raise FileNotFoundError(f"Contextual workbook cannot be found:\n{CONTEXTUAL_FILE}")
+    contextual_file = SUPPLY_CONTEXTUAL_FILE if SUPPLY_CONTEXTUAL_FILE.exists() else DEFAULT_CONTEXTUAL_FILE
+    if not contextual_file.exists():
+        raise FileNotFoundError(f"Contextual workbook cannot be found:\n{contextual_file}")
 
     supply = pd.read_csv(MONTHLY_SUPPLY_FILE, parse_dates=["month"])
-    weather = pd.read_excel(CONTEXTUAL_FILE, sheet_name="Weather", engine="openpyxl")
-    holidays = pd.read_excel(CONTEXTUAL_FILE, sheet_name="Holidays", engine="openpyxl")
+    weather = pd.read_excel(contextual_file, sheet_name="Weather", engine="openpyxl")
+    holidays = pd.read_excel(contextual_file, sheet_name="Holidays", engine="openpyxl")
     air_quality = None
     if variant == "full":
         air_quality = pd.read_excel(
-            CONTEXTUAL_FILE, sheet_name="Air_Quality", engine="openpyxl"
+            contextual_file, sheet_name="Air_Quality", engine="openpyxl"
         )
 
     require_columns(supply, ["month", "crop", "location", "production_kg"], "Supply")

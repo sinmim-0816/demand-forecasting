@@ -2,6 +2,8 @@
 
 The demand workflow predicts monthly crop demand for horizons H1 through H12 using one global model per algorithm. The crop, location, and forecast horizon are model inputs.
 
+The current synthetic preprocessing experiment uses 98 active crop names from the system catalogue and covers January 2016 through December 2025. Two catalogue rows marked `is_deleted=true` are excluded. These generated values are for pipeline and prototype testing only.
+
 Commands are documented in [RUN_GUIDE.md](RUN_GUIDE.md). Folder placement is documented in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Pipeline

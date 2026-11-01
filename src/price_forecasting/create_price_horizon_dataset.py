@@ -355,7 +355,11 @@ def save_outputs(training, prediction_template, variant):
 
     excel_saved = True
     try:
-        training.to_excel(paths["training_excel"], index=False)
+        if len(training) <= 100_000:
+            training.to_excel(paths["training_excel"], index=False)
+        elif paths["training_excel"].exists():
+            paths["training_excel"].unlink()
+            print("Skipped Excel export because the horizon table exceeds 100,000 rows.")
     except OSError as error:
         excel_saved = False
         print(f"Excel skipped because the output file is unavailable: {error}")
@@ -371,7 +375,8 @@ def save_outputs(training, prediction_template, variant):
     print(f"Future price prediction-template rows: {len(prediction_template):,}")
     print(f"Saved: {paths['training_csv']}")
     if excel_saved:
-        print(f"Saved: {paths['training_excel']}")
+        if paths["training_excel"].exists():
+            print(f"Saved: {paths['training_excel']}")
     print(f"Saved: {paths['prediction_template']}")
     if parquet_saved:
         print(f"Saved: {paths['training_parquet']}")

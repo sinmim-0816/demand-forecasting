@@ -10,7 +10,8 @@ import pandas as pd
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SUPPLY_DIR = PROJECT_ROOT / "data" / "processed" / "supply"
 MONTHLY_SUPPLY_FILE = SUPPLY_DIR / "shared" / "monthly_supply.csv"
-CONTEXTUAL_FILE = PROJECT_ROOT / "data" / "raw" / "contextual" / "Contextual_Data.xlsx"
+DEFAULT_CONTEXTUAL_FILE = PROJECT_ROOT / "data" / "raw" / "contextual" / "Contextual_Data.xlsx"
+SUPPLY_CONTEXTUAL_FILE = PROJECT_ROOT / "data" / "raw" / "supply" / "Contextual_Data_10Years_Synthetic.xlsx"
 HORIZONS = range(1, 13)
 VALID_VARIANTS = ("core", "full")
 SOLAR_COLUMN = "avg_daily_shortwave_radiation_mj_m2"
@@ -65,13 +66,14 @@ def load_inputs(variant):
             f"Supply features cannot be found:\n{paths['features']}\n"
             "Run create_supply_features.py first."
         )
-    if not MONTHLY_SUPPLY_FILE.exists() or not CONTEXTUAL_FILE.exists():
+    contextual_file = SUPPLY_CONTEXTUAL_FILE if SUPPLY_CONTEXTUAL_FILE.exists() else DEFAULT_CONTEXTUAL_FILE
+    if not MONTHLY_SUPPLY_FILE.exists() or not contextual_file.exists():
         raise FileNotFoundError("Monthly supply or contextual workbook is unavailable.")
 
     features = pd.read_csv(paths["features"], parse_dates=["month"])
     supply = pd.read_csv(MONTHLY_SUPPLY_FILE, parse_dates=["month"])
-    weather = pd.read_excel(CONTEXTUAL_FILE, sheet_name="Weather", engine="openpyxl")
-    holidays = pd.read_excel(CONTEXTUAL_FILE, sheet_name="Holidays", engine="openpyxl")
+    weather = pd.read_excel(contextual_file, sheet_name="Weather", engine="openpyxl")
+    holidays = pd.read_excel(contextual_file, sheet_name="Holidays", engine="openpyxl")
     require_columns(features, ["month", "crop", "location", "production_kg"], "Supply features")
     require_columns(supply, ["month", "crop", "location", "production_kg"], "Monthly supply")
     require_columns(weather, WEATHER_RENAME, "Weather")
@@ -227,12 +229,19 @@ def save_outputs(training, future, variant):
     paths["training_csv"].parent.mkdir(parents=True, exist_ok=True)
     training.to_csv(paths["training_csv"], index=False, date_format="%Y-%m-%d")
     training.to_parquet(paths["training_parquet"], index=False)
-    training.to_excel(paths["training_excel"], index=False)
+    # Large 10-year, multi-crop horizon tables can exceed Excel's practical
+    # worksheet limit. CSV and Parquet remain the authoritative training files.
+    if len(training) <= 100_000:
+        training.to_excel(paths["training_excel"], index=False)
+    elif paths["training_excel"].exists():
+        paths["training_excel"].unlink()
+        print("Skipped Excel export because the horizon table exceeds 100,000 rows.")
     future.to_csv(paths["future"], index=False, date_format="%Y-%m-%d")
     print(f"Training rows: {len(training):,}")
     print(f"Future prediction-template rows: {len(future):,}")
     for key in ("training_csv", "training_parquet", "training_excel", "future"):
-        print(f"Saved: {paths[key]}")
+        if paths[key].exists():
+            print(f"Saved: {paths[key]}")
 
 
 def main(variant="core"):

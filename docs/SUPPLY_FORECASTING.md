@@ -66,7 +66,7 @@ python scripts\run_supply_preprocessing_pipeline.py --start-at splits --variant 
 
 Until the configured supply file exists, the first command intentionally stops with a message describing the required input. This protects the pipeline from silently inventing production values.
 
-The current `supply_history.xlsx` workbook is explicitly marked as synthetic and is intended for pipeline and prototype-model testing only. Replace it with verified local production records before interpreting model scores as real forecasting performance.
+The current `supply_history.xlsx` workbook uses the uploaded system crop catalogue. It contains 100 catalogue rows, of which 98 are active and 2 are marked deleted and excluded. It covers synthetic monthly production from January 2016 through December 2025. The workbook and its 2016–2020 contextual extension are intended for pipeline and prototype-model testing only. Replace them with verified local production records before interpreting model scores as real forecasting performance.
 
 ## Outputs
 
@@ -78,6 +78,8 @@ data/processed/supply/{core,full}/future_supply_horizon_features.csv
 data/processed/supply/{core,full}/model_splits/{train,validation,test}.csv
 artifacts/supply/{core,full}/reports/model_data_split.json
 ```
+
+For the 98-crop, 10-year experiment, the H1–H12 training tables are larger than 100,000 rows. CSV and Parquet are therefore the authoritative horizon outputs; Excel export is intentionally skipped for those large tables.
 
 ## Minimum history
 
